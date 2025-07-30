@@ -76,10 +76,7 @@ export default function UserProfileDropdown() {
 
           {/* Menu Items */}
           <div className="py-1">
-            <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-slate hover:bg-midnight-beige/30 transition-colors">
-              <User className="h-4 w-4 text-midnight-slate" />
-              <span>Profile Settings</span>
-            </button>
+      
 
             <button
               className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-slate hover:bg-midnight-beige/30 transition-colors"
@@ -89,22 +86,16 @@ export default function UserProfileDropdown() {
               <span>Trusted Contacts</span>
             </button>
 
-            <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-slate hover:bg-midnight-beige/30 transition-colors">
-              <MapPin className="h-4 w-4 text-midnight-teal" />
-              <span>My Routes</span>
-            </button>
+           
 
-            <button className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-slate hover:bg-midnight-beige/30 transition-colors">
-              <Settings className="h-4 w-4 text-midnight-slate" />
-              <span>App Settings</span>
-            </button>
+            
           </div>
 
           {/* Sign Out */}
           <div className="border-t border-midnight-beige pt-1">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-coral hover:bg-midnight-coral/10 transition-colors"
+              className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-black hover:bg-midnight-coral/10 transition-colors"
             >
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>

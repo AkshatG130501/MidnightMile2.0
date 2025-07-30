@@ -10,7 +10,6 @@ import {
   TrustedContact,
 } from "@/types";
 import { COLORS, SAFETY_COLORS } from "@/constants";
-import RouteBottomDrawer from "./RouteBottomDrawer";
 import VoiceMicrophone, { VoiceMicrophoneHandle } from "./VoiceMicrophone";
 import { handleEmergencyAlertFromVoice } from "@/services/emergencyAlertBridge";
 
@@ -47,8 +46,6 @@ export default function MapComponent({
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [userClosedDrawer, setUserClosedDrawer] = useState(false);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const polylinesRef = useRef<google.maps.Polyline[]>([]); // Changed to array for multiple segments
   const startMarkerRef = useRef<google.maps.Marker | null>(null);
@@ -749,9 +746,6 @@ export default function MapComponent({
         destinationMarkerRef.current.setMap(null);
         destinationMarkerRef.current = null;
       }
-      // Close drawer when no route
-      setIsDrawerOpen(false);
-      setUserClosedDrawer(false); // Reset when no routes
       return;
     }
 
@@ -877,10 +871,9 @@ export default function MapComponent({
     };
   }, [map, selectedRoute]);
 
-  // Reset drawer state when navigation ends
+  // Reset state when navigation ends
   useEffect(() => {
     if (!walkSession) {
-      setUserClosedDrawer(false);
       // Clear walking animation and marker when navigation ends
       if (walkingAnimationRef.current) {
         cancelAnimationFrame(walkingAnimationRef.current);
@@ -897,13 +890,6 @@ export default function MapComponent({
       startWalkingSimulation(walkSession.route);
     }
   }, [walkSession, map, startWalkingSimulation]);
-
-  // Open drawer when routes are available (only if not already closed by user and not in navigation)
-  useEffect(() => {
-    if (routes && routes.length > 0 && !userClosedDrawer && !walkSession) {
-      setIsDrawerOpen(true);
-    }
-  }, [routes, userClosedDrawer, walkSession]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1107,8 +1093,8 @@ export default function MapComponent({
         </div>
       )}
 
-      {/* Voice Assistant Microphone - positioned below legend */}
-      {selectedRoute && (
+      {/* Voice Assistant Microphone - only shown during active navigation */}
+      {walkSession && (
         <VoiceMicrophone
           ref={voiceMicrophoneRef}
           className="absolute top-52 right-4 z-10"
@@ -1121,43 +1107,30 @@ export default function MapComponent({
                   walkSession.route.estimatedTime || 0
                 )} minutes remaining`
               : `Route planned - ${
-                  selectedRoute.id.includes("safest")
+                  selectedRoute?.id.includes("safest")
                     ? "Safest route"
                     : "Fastest route"
                 } selected`,
             walkingState: walkSession ? "walking" : "planning",
-            safetyScore: selectedRoute.safetyScore.overall,
+            safetyScore: walkSession.route.safetyScore.overall,
             routeDetails: {
-              distance: selectedRoute.distance,
-              estimatedTime: selectedRoute.estimatedTime,
-              dangerZones: selectedRoute.dangerZones.length,
-              safeSpots: selectedRoute.safeSpots.length,
-              routeType: selectedRoute.id.includes("safest")
+              distance: walkSession.route.distance,
+              estimatedTime: walkSession.route.estimatedTime,
+              dangerZones: walkSession.route.dangerZones.length,
+              safeSpots: walkSession.route.safeSpots.length,
+              routeType: walkSession.route.id.includes("safest")
                 ? "safest"
                 : "fastest",
             },
             trustedContacts: trustedContacts,
           }}
-          onListeningStateChange={(isListening) => {
+          onListeningStateChange={(isListening: boolean) => {
             console.log(
               `Voice assistant ${isListening ? "started" : "stopped"} listening`
             );
           }}
           onNearestSafetySpotRequest={handleNearestSafetySpotRequest}
           onEmergencyAlertRequest={handleEmergencyAlertFromVoice}
-        />
-      )}
-
-      {/* Route Bottom Drawer - Hide when navigation is active */}
-      {!walkSession && (
-        <RouteBottomDrawer
-          routes={routes || null}
-          isOpen={isDrawerOpen}
-          onClose={() => {
-            setIsDrawerOpen(false);
-            setUserClosedDrawer(true);
-          }}
-          onRouteSelect={onRouteSelect}
         />
       )}
     </div>

@@ -1,12 +1,32 @@
-# Midnight Mile - Personal Safety App
+# 🌙 Midnight Mile - Personal Safety App
 
 **Tagline:** "Security in every step."
 
-A map-first personal safety application built with Next.js, designed to provide secure navigation and peace of mind during nighttime walks.
+A modern, AI-powered personal safety app with a beautiful landing page and Supabase authentication. Built with Next.js, designed to provide secure navigation and peace of mind during nighttime walks.
 
-## 🎯 Features
+![Midnight Mile](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38BDF8?style=for-the-badge&logo=tailwind-css)
+![Supabase](https://img.shields.io/badge/Supabase-Auth-green?style=for-the-badge&logo=supabase)
 
-### Core Safety Features
+## ✨ Features
+
+### � Modern Landing Page
+- **Stunning gradient design** with purple/pink theme
+- **Hero section** with compelling copy and call-to-action
+- **Feature showcase** with interactive cards and icons
+- **User testimonials** with real avatars and ratings
+- **Statistics section** with animated counters
+- **Responsive design** for all devices
+
+### 🔐 Authentication System
+- **Supabase OAuth** integration with GitHub and Google
+- **Email/password** authentication with validation
+- **Protected routes** and user session management
+- **User profile dropdown** with settings and sign-out
+- **Beautiful auth modal** with modern design
+
+### 🗺️ Core Safety Features
 
 - **Map-First Interface**: Full-screen map with night mode optimized for visibility
 - **Safe Route Calculation**: Routes prioritized for safety over speed

@@ -254,7 +254,8 @@ export default function Home() {
       <div className="absolute inset-0 pt-[240px] sm:pt-[220px]">
         <MapComponent
           center={getMapCenter()}
-          route={route}
+          routes={route ? [route] : null}
+          selectedRoute={route}
           safeSpots={safeSpots}
           currentLocation={currentLocation || undefined}
           className="w-full h-full"

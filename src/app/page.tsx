@@ -272,6 +272,7 @@ export default function Home() {
           selectedRoute={selectedRoute}
           safeSpots={safeSpots}
           currentLocation={currentLocation || undefined}
+          destination={destination}
           className="w-full h-full"
           onRouteSelect={handleRouteSelect}
           walkSession={walkSession}

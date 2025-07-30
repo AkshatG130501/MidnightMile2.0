@@ -5,6 +5,7 @@ import { googleMapsService } from "@/services/googleMaps";
 import { Location, SafeSpot, Route, WalkSession } from "@/types";
 import { COLORS, SAFETY_COLORS } from "@/constants";
 import RouteBottomDrawer from "./RouteBottomDrawer";
+import VoiceMicrophone, { VoiceMicrophoneHandle } from "./VoiceMicrophone";
 
 interface MapComponentProps {
   center: Location;
@@ -13,6 +14,7 @@ interface MapComponentProps {
   selectedRoute?: Route | null; // Currently selected/displayed route
   safeSpots?: SafeSpot[];
   currentLocation?: Location;
+  destination?: (Location & { address: string }) | null; // Add destination prop
   className?: string;
   onRouteSelect?: (route: Route) => void; // Callback when user selects a route
   walkSession?: WalkSession | null; // Add walkSession prop to hide drawer during navigation
@@ -26,6 +28,7 @@ export default function MapComponent({
   selectedRoute,
   safeSpots = [],
   currentLocation,
+  destination,
   className = "w-full h-screen",
   onRouteSelect,
   walkSession,
@@ -43,6 +46,7 @@ export default function MapComponent({
   const destinationMarkerRef = useRef<google.maps.Marker | null>(null);
   const walkerMarkerRef = useRef<google.maps.Marker | null>(null);
   const walkingAnimationRef = useRef<number | null>(null);
+  const voiceMicrophoneRef = useRef<VoiceMicrophoneHandle>(null);
 
   // Helper function to create custom icons for start and destination points
   const createLocationIcon = (type: "start" | "destination") => {
@@ -146,6 +150,136 @@ export default function MapComponent({
     return points;
   };
 
+  // Function to create checkpoints along the route
+  const createRouteCheckpoints = useCallback(
+    (route: Route, numCheckpoints: number = 10): Location[] => {
+      const pathPoints = getRoutePathPoints(route);
+      if (pathPoints.length < 2) return [];
+
+      const checkpoints: Location[] = [];
+
+      // Calculate total route segments
+      const totalSegments = pathPoints.length - 1;
+
+      for (let i = 0; i <= numCheckpoints; i++) {
+        const progress = i / numCheckpoints;
+        const segmentFloat = progress * totalSegments;
+        const segmentIndex = Math.floor(segmentFloat);
+        const segmentProgress = segmentFloat - segmentIndex;
+
+        if (segmentIndex < totalSegments) {
+          const start = pathPoints[segmentIndex];
+          const end = pathPoints[segmentIndex + 1];
+          const checkpoint = interpolatePosition(start, end, segmentProgress);
+          checkpoints.push(checkpoint);
+        } else {
+          // Last checkpoint is the destination
+          checkpoints.push(pathPoints[pathPoints.length - 1]);
+        }
+      }
+
+      return checkpoints;
+    },
+    []
+  );
+
+  // Function to generate navigation instructions for checkpoints
+  const generateNavigationInstruction = useCallback(
+    (
+      currentCheckpoint: number,
+      currentPosition: Location,
+      nextPosition: Location
+    ): string => {
+      if (currentCheckpoint === 0) {
+        return "Starting your journey. Head towards your destination following the safest route.";
+      }
+
+      if (currentCheckpoint >= 9) {
+        return "You're almost there! Your destination is just ahead.";
+      }
+
+      // Calculate bearing/direction to next checkpoint
+      const bearing = calculateBearing(currentPosition, nextPosition);
+      const direction = getDirectionFromBearing(bearing);
+
+      const instructions = [
+        `Continue ${direction} towards your destination.`,
+        `Keep going ${direction}. You're making good progress.`,
+        `Follow the path ${direction}. Stay safe and aware of your surroundings.`,
+        `Head ${direction} and stay on the safest route.`,
+        `Continue ${direction}. Remember, safety comes first.`,
+      ];
+
+      // Add safety reminders occasionally
+      const safetyReminders = [
+        "Stay alert and aware of your surroundings.",
+        "Keep your phone charged and visible.",
+        "Trust your instincts if something feels off.",
+        "You're on the safest route - keep going!",
+      ];
+
+      let instruction = instructions[currentCheckpoint % instructions.length];
+
+      // Add safety reminder every 3rd checkpoint
+      if (currentCheckpoint % 3 === 0) {
+        instruction += ` ${
+          safetyReminders[
+            Math.floor(currentCheckpoint / 3) % safetyReminders.length
+          ]
+        }`;
+      }
+
+      return instruction;
+    },
+    []
+  );
+
+  // Function to calculate bearing between two points
+  const calculateBearing = (start: Location, end: Location): number => {
+    const dLng = ((end.lng - start.lng) * Math.PI) / 180;
+    const lat1 = (start.lat * Math.PI) / 180;
+    const lat2 = (end.lat * Math.PI) / 180;
+
+    const x = Math.sin(dLng) * Math.cos(lat2);
+    const y =
+      Math.cos(lat1) * Math.sin(lat2) -
+      Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+
+    const bearing = (Math.atan2(x, y) * 180) / Math.PI;
+    return (bearing + 360) % 360;
+  };
+
+  // Function to convert bearing to direction
+  const getDirectionFromBearing = (bearing: number): string => {
+    const directions = [
+      "north",
+      "northeast",
+      "east",
+      "southeast",
+      "south",
+      "southwest",
+      "west",
+      "northwest",
+    ];
+    const index = Math.round(bearing / 45) % 8;
+    return directions[index];
+  };
+
+  // Function to announce navigation instructions using voice
+  const announceNavigation = useCallback(async (instruction: string) => {
+    console.log("Navigation announcement:", instruction);
+
+    // Use AI voice assistant through the voice queue
+    if (voiceMicrophoneRef.current) {
+      try {
+        await voiceMicrophoneRef.current.announceNavigation(instruction);
+      } catch (error) {
+        console.error("Navigation announcement failed:", error);
+        // Voice queue handles fallbacks internally, so no additional fallback needed
+      }
+    }
+  }, []);
+
   // Function to start walking simulation
   const startWalkingSimulation = useCallback(
     (route: Route) => {
@@ -164,6 +298,11 @@ export default function MapComponent({
       const pathPoints = getRoutePathPoints(route);
       if (pathPoints.length < 2) return;
 
+      // Create checkpoints for navigation guidance
+      const checkpoints = createRouteCheckpoints(route, 10);
+      let currentCheckpointIndex = 0;
+      let hasAnnouncedCheckpoint = false;
+
       // Create walker marker
       walkerMarkerRef.current = new google.maps.Marker({
         position: pathPoints[0],
@@ -173,8 +312,16 @@ export default function MapComponent({
         zIndex: 1000,
       });
 
-      const animationDuration = 60000; // 1 minute in milliseconds
+      const animationDuration = 300000; // 5 minutes in milliseconds
       const startTime = Date.now();
+
+      // Announce the start of the journey
+      const startInstruction = generateNavigationInstruction(
+        0,
+        checkpoints[0],
+        checkpoints[1]
+      );
+      announceNavigation(startInstruction);
 
       const animate = () => {
         const elapsed = Date.now() - startTime;
@@ -192,6 +339,10 @@ export default function MapComponent({
               pathPoints[pathPoints.length - 1]
             );
           }
+          // Announce arrival
+          announceNavigation(
+            "You have arrived at your destination! Stay safe and have a great time."
+          );
           return;
         }
 
@@ -213,6 +364,37 @@ export default function MapComponent({
           if (walkerMarkerRef.current) {
             walkerMarkerRef.current.setPosition(currentPosition);
           }
+
+          // Check if we've reached the next checkpoint
+          const checkpointProgress = progress * (checkpoints.length - 1);
+          const targetCheckpointIndex = Math.floor(checkpointProgress);
+
+          if (
+            targetCheckpointIndex > currentCheckpointIndex &&
+            targetCheckpointIndex < checkpoints.length - 1
+          ) {
+            currentCheckpointIndex = targetCheckpointIndex;
+            hasAnnouncedCheckpoint = false;
+          }
+
+          // Announce navigation instruction when reaching a checkpoint
+          if (
+            !hasAnnouncedCheckpoint &&
+            targetCheckpointIndex === currentCheckpointIndex &&
+            currentCheckpointIndex > 0
+          ) {
+            const nextCheckpointIndex = Math.min(
+              currentCheckpointIndex + 1,
+              checkpoints.length - 1
+            );
+            const instruction = generateNavigationInstruction(
+              currentCheckpointIndex,
+              checkpoints[currentCheckpointIndex],
+              checkpoints[nextCheckpointIndex]
+            );
+            announceNavigation(instruction);
+            hasAnnouncedCheckpoint = true;
+          }
         }
 
         walkingAnimationRef.current = requestAnimationFrame(animate);
@@ -220,7 +402,13 @@ export default function MapComponent({
 
       animate();
     },
-    [map, onSimulationProgress]
+    [
+      map,
+      onSimulationProgress,
+      announceNavigation,
+      createRouteCheckpoints,
+      generateNavigationInstruction,
+    ]
   );
 
   // Initialize map
@@ -750,6 +938,44 @@ export default function MapComponent({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Voice Assistant Microphone - positioned below legend */}
+      {selectedRoute && (
+        <VoiceMicrophone
+          ref={voiceMicrophoneRef}
+          className="absolute top-52 right-4 z-10"
+          context={{
+            currentLocation:
+              currentLocation?.address || "Samvidhan Sadan (starting point)",
+            destination: destination?.address || "Selected destination",
+            routeStatus: walkSession
+              ? `Walking in progress - ${Math.round(
+                  walkSession.route.estimatedTime || 0
+                )} minutes remaining`
+              : `Route planned - ${
+                  selectedRoute.id.includes("safest")
+                    ? "Safest route"
+                    : "Fastest route"
+                } selected`,
+            walkingState: walkSession ? "walking" : "planning",
+            safetyScore: selectedRoute.safetyScore.overall,
+            routeDetails: {
+              distance: selectedRoute.distance,
+              estimatedTime: selectedRoute.estimatedTime,
+              dangerZones: selectedRoute.dangerZones.length,
+              safeSpots: selectedRoute.safeSpots.length,
+              routeType: selectedRoute.id.includes("safest")
+                ? "safest"
+                : "fastest",
+            },
+          }}
+          onListeningStateChange={(isListening) => {
+            console.log(
+              `Voice assistant ${isListening ? "started" : "stopped"} listening`
+            );
+          }}
+        />
       )}
 
       {/* Route Bottom Drawer - Hide when navigation is active */}

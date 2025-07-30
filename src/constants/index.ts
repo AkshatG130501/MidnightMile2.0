@@ -195,7 +195,7 @@ export const VOICE_COMPANION = {
   CHECKIN_INTERVALS: [300, 600, 900], // seconds (5, 10, 15 minutes)
   VOICE_SPEED: 1.0,
   VOICE_PITCH: 1.0,
-  DEFAULT_VOICE_ID: "masculine-confident", // Eleven Labs voice ID
+  DEFAULT_VOICE_ID: "x3gYeuNB0kLLYxOZsaSh", // Eleven Labs voice ID
   BACKGROUND_MONITORING: true,
 } as const;
 

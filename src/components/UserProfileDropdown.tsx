@@ -49,7 +49,7 @@ export default function UserProfileDropdown() {
       {/* Profile Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="mt-2 mr-1 w-12 h-12 bg-gradient-to-r from-midnight-navy to-midnight-teal text-white rounded-full flex items-center justify-center font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200"
+        className="mt-4 mr-1 w-12 h-12 bg-gradient-to-r from-midnight-navy to-midnight-teal text-white rounded-full flex items-center justify-center font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200"
       >
         {userInitials}
       </button>

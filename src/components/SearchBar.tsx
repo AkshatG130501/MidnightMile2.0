@@ -232,9 +232,12 @@ export default function SearchBar({
   return (
     <div ref={containerRef} className="relative w-full py-2">
       {/* Enhanced Google Maps style search bar */}
-      <div className="flex items-center bg-white rounded-xl shadow-lg border border-midnight-beige overflow-hidden hover:shadow-xl transition-all duration-300 mx-auto" style={{ width: '420px', maxWidth: '90vw' }}>
+      <div
+        className="flex items-center bg-white rounded-xl shadow-lg border border-midnight-beige overflow-hidden hover:shadow-xl transition-all duration-300 mx-auto"
+        style={{ width: "420px", maxWidth: "90vw" }}
+      >
         {/* Search input section */}
-        <div className="flex-1 flex items-center">
+        <div className="flex-1 flex items-center py-2">
           <input
             ref={inputRef}
             type="text"

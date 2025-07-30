@@ -231,7 +231,7 @@ export default function SearchBar({
   return (
     <div ref={containerRef} className="relative w-full py-2">
       {/* Enhanced Google Maps style search bar */}
-      <div className="flex items-center bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 max-w-none mx-auto">
+      <div className="flex items-center bg-white rounded-xl shadow-lg border border-midnight-beige overflow-hidden hover:shadow-xl transition-all duration-300 max-w-none mx-auto">
         {/* Search input section */}
         <div className="flex-1 flex items-center">
           <input
@@ -242,7 +242,7 @@ export default function SearchBar({
             onFocus={() => setShowResults(true)}
             disabled={disabled}
             placeholder={placeholder}
-            className="flex-1 px-8 py-3 text-base text-gray-900 placeholder-gray-500 bg-transparent border-none outline-none focus:ring-0 disabled:opacity-50"
+            className="flex-1 px-8 py-3 text-base text-midnight-navy placeholder-midnight-slate bg-transparent border-none outline-none focus:ring-0 disabled:opacity-50"
           />
         </div>
 
@@ -252,14 +252,14 @@ export default function SearchBar({
           {query && (
             <button
               onClick={handleClear}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors mx-1"
+              className="p-2 hover:bg-midnight-beige/50 rounded-full transition-colors mx-1"
             >
-              <X className="h-4 w-4 text-gray-600" />
+              <X className="h-4 w-4 text-midnight-slate" />
             </button>
           )}
 
           {/* Search button */}
-          <button className="p-3 hover:bg-blue-50 transition-colors border-l border-gray-100">
+          <button className="p-3 hover:bg-midnight-teal/10 transition-colors border-l border-midnight-beige">
             <Search className="h-5 w-5 text-midnight-teal" />
           </button>
         </div>
@@ -267,12 +267,12 @@ export default function SearchBar({
 
       {/* Enhanced loading indicator */}
       {isLoading && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-xl p-3 z-30 backdrop-blur-sm">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-midnight-beige rounded-xl shadow-xl p-3 z-30 backdrop-blur-sm">
           <div className="flex items-center space-x-3">
             <div className="relative">
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-midnight-teal"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-midnight-beige border-t-midnight-teal"></div>
             </div>
-            <span className="text-sm text-gray-700 font-medium">
+            <span className="text-sm text-midnight-slate font-medium">
               Searching for places...
             </span>
           </div>
@@ -281,8 +281,8 @@ export default function SearchBar({
 
       {/* Enhanced Search Results */}
       {showResults && !isLoading && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl max-h-80 overflow-hidden z-30 backdrop-blur-sm animate-slide-in">
-          <div className="overflow-y-auto max-h-80 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-midnight-beige rounded-xl shadow-2xl max-h-80 overflow-hidden z-30 backdrop-blur-sm animate-slide-in">
+          <div className="overflow-y-auto max-h-80 scrollbar-thin scrollbar-thumb-midnight-slate/30 scrollbar-track-midnight-beige/30">
             {/* Current search results */}
             {results.length > 0 && (
               <div>
@@ -290,18 +290,18 @@ export default function SearchBar({
                   <button
                     key={`${result.place_id}-${index}`}
                     onClick={() => handleResultSelect(result)}
-                    className="w-full text-left px-6 py-4 hover:bg-gradient-to-r hover:from-blue-50 hover:to-midnight-beige/20 flex items-center space-x-4 border-b border-gray-50 last:border-b-0 transition-all duration-200 group"
+                    className="w-full text-left px-6 py-4 hover:bg-gradient-to-r hover:from-midnight-teal/10 hover:to-midnight-beige/30 flex items-center space-x-4 border-b border-midnight-beige/50 last:border-b-0 transition-all duration-200 group"
                   >
-                    <div className="p-2 rounded-full bg-gray-100 group-hover:bg-midnight-teal/10 transition-colors">
-                      <MapPin className="h-4 w-4 text-gray-500 group-hover:text-midnight-teal transition-colors" />
+                    <div className="p-2 rounded-full bg-midnight-beige/50 group-hover:bg-midnight-teal/20 transition-colors">
+                      <MapPin className="h-4 w-4 text-midnight-slate group-hover:text-midnight-teal transition-colors" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate group-hover:text-midnight-teal transition-colors">
+                      <p className="text-sm font-medium text-midnight-navy truncate group-hover:text-midnight-teal transition-colors">
                         {result.structured_formatting?.main_text ||
                           result.description.split(",")[0] ||
                           result.description}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      <p className="text-xs text-midnight-slate mt-0.5 truncate">
                         {result.structured_formatting?.secondary_text ||
                           result.description
                             .split(",")

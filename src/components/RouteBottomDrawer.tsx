@@ -18,7 +18,8 @@ interface RouteBottomDrawerProps {
   routes: Route[] | null; // Changed from single route to multiple routes
   isOpen: boolean;
   onClose: () => void;
-  onRouteSelect?: (route: Route) => void; // Callback when user selects a route
+  onRouteSelect?: (route: Route) => void; // Callback when user selects a route for navigation
+  onRoutePreview?: (route: Route) => void; // Callback when user previews a route (carousel swipe)
 }
 
 export default function RouteBottomDrawer({
@@ -26,6 +27,7 @@ export default function RouteBottomDrawer({
   isOpen,
   onClose,
   onRouteSelect,
+  onRoutePreview,
 }: RouteBottomDrawerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startY, setStartY] = useState(0);
@@ -45,6 +47,13 @@ export default function RouteBottomDrawer({
   const sortedRoutes = routes
     ? [...routes].sort((a, b) => b.safetyScore.overall - a.safetyScore.overall)
     : [];
+
+  // Call onRoutePreview when carousel index changes
+  useEffect(() => {
+    if (sortedRoutes.length > 0 && onRoutePreview) {
+      onRoutePreview(sortedRoutes[currentRouteIndex]);
+    }
+  }, [currentRouteIndex, sortedRoutes, onRoutePreview]);
 
   // Handle vertical drawer swiping
   const handleStart = useCallback((clientY: number) => {

@@ -50,6 +50,7 @@ export default function Home() {
   const [simulationProgress, setSimulationProgress] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [isRouteDrawerOpen, setIsRouteDrawerOpen] = useState(false);
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // New immersive navigation mode
 
   // Handle OAuth callback tokens in URL
   useEffect(() => {
@@ -209,6 +210,14 @@ export default function Home() {
     }
   };
 
+  // Handle clearing search
+  const handleSearchClear = () => {
+    setDestination(null);
+    setRoutes(null);
+    setSelectedRoute(null);
+    setError(null);
+  };
+
   // Handle route selection from drawer
   const handleRouteSelect = (route: Route) => {
     setSelectedRoute(route);
@@ -217,6 +226,8 @@ export default function Home() {
     if (currentLocation) {
       setSimulationProgress(0); // Reset progress
       setVoiceCompanionEnabled(true); // Enable voice companion when navigation starts
+      setIsImmersiveMode(true); // Enable immersive navigation mode
+      setIsRouteDrawerOpen(false); // Close drawer for immersive experience
 
       const session: WalkSession = {
         id: Date.now().toString(),
@@ -229,6 +240,19 @@ export default function Home() {
       };
 
       setWalkSession(session);
+
+      // Add haptic feedback for navigation start
+      if (navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]); // Start vibration pattern
+      }
+
+      // Add smooth transition delay for immersive mode
+      setTimeout(() => {
+        // Additional haptic feedback for immersive mode activation
+        if (navigator.vibrate) {
+          navigator.vibrate([50, 50, 50]); // Triple pulse for 3D activation
+        }
+      }, 1000);
 
       // Start voice companion if enabled
       if (elevenLabsService.isConfigured()) {
@@ -320,6 +344,22 @@ export default function Home() {
     setIsRouteDrawerOpen(false);
   };
 
+  // Exit immersive navigation mode and end navigation
+  const handleExitImmersiveMode = () => {
+    setIsImmersiveMode(false);
+    setWalkSession(null); // End the navigation session
+    setSimulationProgress(0); // Reset progress
+    setVoiceCompanionEnabled(false); // Disable voice companion
+    setSelectedRoute(null); // Clear selected route
+    setRoutes(null); // Clear all routes
+    setDestination(null); // Clear destination
+
+    // Add haptic feedback
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 50, 100]); // Double vibration for navigation end
+    }
+  };
+
   // Get dynamic navigation instruction based on progress
   const getNavigationInstruction = (progress: number) => {
     if (progress < 25) {
@@ -376,6 +416,8 @@ export default function Home() {
       setTimeout(() => {
         setWalkSession(null);
         setSimulationProgress(0);
+        setIsImmersiveMode(false); // Exit immersive mode when navigation ends
+        setVoiceCompanionEnabled(false); // Disable voice companion
       }, 3000); // 3 seconds delay to show arrival message
     }
   }, [simulationProgress, walkSession, voiceCompanionEnabled]);
@@ -433,11 +475,19 @@ export default function Home() {
   }
 
   return (
-    <div className="relative h-screen bg-white overflow-hidden">
-      {/* User Profile Header */}
-      <div className="absolute top-6 right-6 z-40">
-        <UserProfileDropdown />
-      </div>
+    <div
+      className={`relative h-screen overflow-hidden transition-all duration-500 ${
+        isImmersiveMode
+          ? "bg-gray-900" // Dark background for immersive mode
+          : "bg-white"
+      }`}
+    >
+      {/* User Profile Header - Hidden in immersive mode */}
+      {!isImmersiveMode && (
+        <div className="absolute top-6 right-6 z-40">
+          <UserProfileDropdown />
+        </div>
+      )}
 
       {/* Map - Full screen like Google Maps */}
       <div className="absolute inset-0 z-0">
@@ -448,44 +498,113 @@ export default function Home() {
           safeSpots={safeSpots}
           currentLocation={currentLocation || undefined}
           destination={destination}
-          className="w-full h-full"
+          className={`w-full h-full transition-all duration-500 ${
+            isImmersiveMode ? "brightness-90 contrast-110" : ""
+          }`}
           onRouteSelect={handleRouteSelect}
           onRouteUpdate={handleRouteUpdate}
           walkSession={walkSession}
           onSimulationProgress={setSimulationProgress}
+          isImmersiveMode={isImmersiveMode}
         />
       </div>
 
-      {/* Floating search bar with menu button */}
-      <div className="absolute top-6 left-4 z-10">
-        <div className="flex items-center gap-3 menu-container">
-          <div className="flex-1">
-            <SearchBar
-              onDestinationSelect={handleDestinationSelect}
-              currentLocation={FIXED_STARTING_LOCATION}
-              disabled={isRouteLoading}
-              placeholder="Search for destinations"
-            />
-          </div>
+      {/* Floating search bar - Hidden in immersive mode */}
+      {!isImmersiveMode && (
+        <div className="absolute top-6 left-6 right-20 z-20">
+          <SearchBar
+            onDestinationSelect={handleDestinationSelect}
+            onClear={handleSearchClear}
+            currentLocation={FIXED_STARTING_LOCATION}
+            disabled={isRouteLoading}
+            placeholder="Search for destinations in Delhi..."
+          />
         </div>
-      </div>
+      )}
 
-      {/* Menu Dropdown */}
-      {showMenu && (
-        <div className="absolute top-20 left-6 z-20 menu-container">
-          <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-xl p-2 min-w-[200px]">
-            <button
-              onClick={() => {
-                router.push("/trusted-contacts");
-                setShowMenu(false);
-              }}
-              className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-            >
-              <Users className="h-5 w-5 text-midnight-teal" />
-              <span className="font-medium text-midnight-navy">
-                Trusted Contacts
-              </span>
-            </button>
+      {/* Immersive Navigation Header */}
+      {isImmersiveMode && walkSession && (
+        <div className="absolute top-0 left-0 right-0 z-50">
+          <div className="bg-gradient-to-b from-gray-900/95 to-transparent backdrop-blur-sm">
+            <div className="flex items-center justify-between p-4 text-white">
+              {/* Exit Button */}
+              <button
+                onClick={handleExitImmersiveMode}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-all duration-200 backdrop-blur-sm"
+                aria-label="Exit immersive mode"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              {/* Navigation Info */}
+              <div className="flex-1 text-center">
+                <div className="text-lg font-semibold">
+                  {currentInstruction.action}
+                </div>
+                <div className="text-sm text-gray-300">
+                  {currentInstruction.distance} • {currentInstruction.street}
+                </div>
+              </div>
+
+              {/* Voice Toggle */}
+              <button
+                onClick={() => setVoiceCompanionEnabled(!voiceCompanionEnabled)}
+                className={`p-2 rounded-full transition-all duration-200 backdrop-blur-sm ${
+                  voiceCompanionEnabled
+                    ? "bg-blue-500/80 text-white"
+                    : "bg-white/20 text-gray-300"
+                }`}
+                aria-label="Toggle voice companion"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="px-4 pb-4">
+              <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-400 to-cyan-400 transition-all duration-300 ease-out shadow-lg"
+                  style={{ width: `${simulationProgress}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-300 mt-2">
+                <span>{Math.round(simulationProgress)}% Complete</span>
+                <span>
+                  {selectedRoute
+                    ? `${(
+                        (selectedRoute.estimatedTime *
+                          (100 - simulationProgress)) /
+                        100
+                      ).toFixed(0)} min left`
+                    : ""}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -529,18 +648,44 @@ export default function Home() {
       {/* Active walk session - Google Maps navigation style */}
       {/* Navigation Interface - Active Walking Session */}
       {walkSession && (
-        <div className="absolute bottom-4 left-4 right-4 z-30">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+        <div
+          className={`absolute z-30 ${
+            isImmersiveMode
+              ? "bottom-6 left-6 right-6" // Centered in immersive mode
+              : "bottom-4 left-4 right-4" // Normal position
+          }`}
+        >
+          <div
+            className={`rounded-2xl shadow-2xl border overflow-hidden transition-all duration-300 ${
+              isImmersiveMode
+                ? "bg-gray-800/95 border-gray-600 backdrop-blur-lg" // Dark theme for immersive
+                : "bg-white border-gray-200" // Light theme for normal
+            }`}
+          >
             {/* Navigation Header */}
-            <div className="bg-midnight-navy px-4 py-3">
+            <div
+              className={`px-4 py-3 ${
+                isImmersiveMode ? "bg-gray-700/50" : "bg-midnight-navy"
+              }`}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-midnight-teal rounded-full animate-pulse"></div>
                   <div>
-                    <p className="font-semibold text-white text-sm">
+                    <p
+                      className={`font-semibold text-sm ${
+                        isImmersiveMode ? "text-gray-100" : "text-white"
+                      }`}
+                    >
                       Navigation Active
                     </p>
-                    <p className="text-midnight-beige text-xs">
+                    <p
+                      className={`text-xs ${
+                        isImmersiveMode
+                          ? "text-gray-300"
+                          : "text-midnight-beige"
+                      }`}
+                    >
                       {walkSession.route.id.includes("safest")
                         ? "Safest Route"
                         : "Fastest Route"}
@@ -548,10 +693,18 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white text-sm font-medium">
+                  <p
+                    className={`text-sm font-medium ${
+                      isImmersiveMode ? "text-gray-100" : "text-white"
+                    }`}
+                  >
                     {formatDuration(walkSession.route.estimatedTime)}
                   </p>
-                  <p className="text-midnight-beige text-xs">
+                  <p
+                    className={`text-xs ${
+                      isImmersiveMode ? "text-gray-300" : "text-midnight-beige"
+                    }`}
+                  >
                     {formatDistance(walkSession.route.distance)}
                   </p>
                 </div>
@@ -559,101 +712,6 @@ export default function Home() {
             </div>
 
             {/* Navigation Instructions */}
-            <div className="p-4 bg-midnight-beige/30">
-              <div className="flex items-center space-x-3 mb-3">
-                <div className="w-8 h-8 bg-midnight-teal/20 rounded-full flex items-center justify-center">
-                  <svg
-                    className="w-4 h-4 text-midnight-teal"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-midnight-navy text-sm">
-                    {currentInstruction.action}
-                  </p>
-                  <p className="text-midnight-slate text-xs">
-                    {currentInstruction.street}
-                  </p>
-                </div>
-                <p className="text-midnight-slate text-xs">
-                  {currentInstruction.distance}
-                </p>
-              </div>
-
-              {/* Safety Status */}
-              <div className="flex items-center space-x-2 mb-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{
-                    backgroundColor:
-                      walkSession.route.safetyScore.overall >= 70
-                        ? "#3D828B" // midnight-teal for safe
-                        : walkSession.route.safetyScore.overall >= 40
-                        ? "#FFB100" // midnight-amber for moderate
-                        : "#E37B7B", // midnight-coral for caution
-                  }}
-                ></div>
-                <span className="text-xs text-midnight-slate">
-                  Current area:{" "}
-                  {walkSession.route.safetyScore.overall >= 70
-                    ? "Safe"
-                    : walkSession.route.safetyScore.overall >= 40
-                    ? "Moderate"
-                    : "Caution needed"}
-                  ({Math.round(walkSession.route.safetyScore.overall)}% safety)
-                </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-3">
-                <div className="flex justify-between text-xs text-midnight-slate mb-1">
-                  <span>Progress</span>
-                  <span>{simulationProgress}% completed</span>
-                </div>
-                <div className="w-full bg-midnight-beige rounded-full h-2">
-                  <div
-                    className="bg-midnight-teal h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${simulationProgress}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleVoiceToggle}
-                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${
-                    voiceCompanionEnabled
-                      ? "bg-midnight-teal/20 text-midnight-teal border border-midnight-teal/30"
-                      : "bg-midnight-beige text-midnight-slate border border-midnight-slate/30"
-                  }`}
-                >
-                  {voiceCompanionEnabled ? "🔊 Voice On" : "🔇 Voice Off"}
-                </button>
-                <button className="px-4 py-2 bg-midnight-coral text-white rounded-lg text-xs font-medium hover:bg-midnight-coral/80 transition-colors">
-                  🚨 SOS
-                </button>
-                <button
-                  onClick={() => {
-                    setWalkSession(null);
-                    setSimulationProgress(0);
-                    setVoiceCompanionEnabled(false); // Disable voice when navigation ends
-                  }}
-                  className="px-4 py-2 bg-midnight-slate text-white rounded-lg text-xs font-medium hover:bg-midnight-slate/80 transition-colors"
-                >
-                  End Navigation
-                </button>
-              </div>
-            </div>
 
             {/* Quick Stats Footer */}
             <div className="bg-white px-4 py-2 border-t border-midnight-beige">

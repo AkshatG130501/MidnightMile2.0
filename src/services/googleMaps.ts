@@ -67,6 +67,15 @@ class GoogleMapsService {
       gestureHandling: "greedy",
       minZoom: MAP_CONFIG.MIN_ZOOM,
       maxZoom: MAP_CONFIG.MAX_ZOOM,
+      // Enhanced settings for smooth camera tracking
+      clickableIcons: false, // Prevent accidental clicks during animation
+      restriction: {
+        latLngBounds: new google.maps.LatLngBounds(
+          new google.maps.LatLng(28.4044, 77.072), // SW corner (Delhi bounds)
+          new google.maps.LatLng(28.8836, 77.3462) // NE corner (Delhi bounds)
+        ),
+        strictBounds: false, // Allow smooth panning outside bounds temporarily
+      },
     };
 
     this.map = new google.maps.Map(container, mapOptions);
@@ -530,6 +539,7 @@ class GoogleMapsService {
             avoidHighways: true,
             avoidTolls: true,
             optimizeWaypoints: false,
+            unitSystem: google.maps.UnitSystem.METRIC, // Use metric system
             region: "in", // Specify region for better local routing
           };
           break;
@@ -544,6 +554,7 @@ class GoogleMapsService {
             avoidHighways: false,
             avoidTolls: false,
             optimizeWaypoints: true,
+            unitSystem: google.maps.UnitSystem.METRIC, // Use metric system
             region: "in", // Specify region for better local routing
           };
           break;
@@ -675,37 +686,37 @@ class GoogleMapsService {
       directionsResult.routes[routeIndex] || directionsResult.routes[0];
     const leg = primaryRoute.legs[0];
 
-    // Extract waypoints from the route - use all points for precise road following
+    // Extract ALL waypoints from the route for proper road following
     const waypoints: Location[] = [];
 
-    // Try to get detailed path from route steps first (more precise)
-    if (primaryRoute.legs[0]?.steps && primaryRoute.legs[0].steps.length > 0) {
-      primaryRoute.legs[0].steps.forEach((step) => {
+    // Use the detailed path from overview_path for accurate road following
+    primaryRoute.overview_path.forEach((point, index) => {
+      waypoints.push({
+        lat: point.lat(),
+        lng: point.lng(),
+      });
+    });
+
+    // If overview_path is not detailed enough, extract from steps
+    if (waypoints.length < 10 && leg.steps) {
+      const detailedWaypoints: Location[] = [];
+      leg.steps.forEach((step) => {
         if (step.path) {
           step.path.forEach((point) => {
-            waypoints.push({
+            detailedWaypoints.push({
               lat: point.lat(),
               lng: point.lng(),
             });
           });
         }
       });
-    }
 
-    // Fallback to overview_path if no detailed steps available
-    if (waypoints.length === 0) {
-      primaryRoute.overview_path.forEach((point) => {
-        waypoints.push({
-          lat: point.lat(),
-          lng: point.lng(),
-        });
-      });
+      // Use detailed waypoints if we got more points
+      if (detailedWaypoints.length > waypoints.length) {
+        waypoints.length = 0; // Clear the array
+        waypoints.push(...detailedWaypoints);
+      }
     }
-
-    // Log route precision for debugging
-    console.log(
-      `Route generated with ${waypoints.length} waypoints for ${routeType} route`
-    );
 
     // Calculate safety score based on route type and characteristics
     const safetyScore = this.calculateSafetyScore(primaryRoute, routeType);

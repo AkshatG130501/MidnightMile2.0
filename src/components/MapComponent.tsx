@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { googleMapsService } from "@/services/googleMaps";
-import { Location, SafeSpot, Route, WalkSession } from "@/types";
+import {
+  Location,
+  SafeSpot,
+  Route,
+  WalkSession,
+  TrustedContact,
+} from "@/types";
 import { COLORS, SAFETY_COLORS } from "@/constants";
 import RouteBottomDrawer from "./RouteBottomDrawer";
 import VoiceMicrophone, { VoiceMicrophoneHandle } from "./VoiceMicrophone";
+import { handleEmergencyAlertFromVoice } from "@/services/emergencyAlertBridge";
 
 interface MapComponentProps {
   center: Location;
@@ -50,6 +57,7 @@ export default function MapComponent({
   const walkingAnimationRef = useRef<number | null>(null);
   const voiceMicrophoneRef = useRef<VoiceMicrophoneHandle>(null);
   const [isProcessingSafetySpot, setIsProcessingSafetySpot] = useState(false);
+  const [trustedContacts, setTrustedContacts] = useState<TrustedContact[]>([]);
 
   // Helper function to create custom icons for start and destination points
   const createLocationIcon = (type: "start" | "destination") => {
@@ -451,6 +459,38 @@ export default function MapComponent({
     initMap();
   }, [center, onLocationSelect]);
 
+  // Load trusted contacts from localStorage
+  useEffect(() => {
+    const loadTrustedContacts = () => {
+      if (typeof window !== "undefined") {
+        const savedContacts = localStorage.getItem("trustedContacts");
+        if (savedContacts) {
+          try {
+            const contacts = JSON.parse(savedContacts);
+            setTrustedContacts(contacts);
+          } catch (error) {
+            console.error("Error parsing trusted contacts:", error);
+            setTrustedContacts([]);
+          }
+        }
+      }
+    };
+
+    loadTrustedContacts();
+
+    // Listen for page visibility change to reload contacts
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadTrustedContacts();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
   // Update current location marker (fixed starting location)
   useEffect(() => {
     if (!map || !currentLocation) return;
@@ -804,10 +844,22 @@ export default function MapComponent({
     // Fit map to show entire route
     if (selectedRoute.waypoints.length > 0) {
       const bounds = new google.maps.LatLngBounds();
+
+      // Include start and end points
+      bounds.extend(
+        new google.maps.LatLng(selectedRoute.start.lat, selectedRoute.start.lng)
+      );
+      bounds.extend(
+        new google.maps.LatLng(selectedRoute.end.lat, selectedRoute.end.lng)
+      );
+
+      // Include all waypoints
       selectedRoute.waypoints.forEach((point: Location) => {
         bounds.extend(new google.maps.LatLng(point.lat, point.lng));
       });
-      map.fitBounds(bounds, 50);
+
+      // Add padding and fit bounds
+      map.fitBounds(bounds, 80); // Increased padding for better visibility
     }
 
     return () => {
@@ -882,13 +934,13 @@ export default function MapComponent({
   // Handle request for nearest safety spot
   const handleNearestSafetySpotRequest = useCallback(async () => {
     console.log("🚨 Safety spot request callback triggered!");
-    
+
     // Prevent multiple concurrent requests
     if (isProcessingSafetySpot) {
       console.log("⚠️ Safety spot request already in progress, ignoring");
       return;
     }
-    
+
     setIsProcessingSafetySpot(true);
 
     // Use walker position if walking, otherwise use current location
@@ -1084,6 +1136,7 @@ export default function MapComponent({
                 ? "safest"
                 : "fastest",
             },
+            trustedContacts: trustedContacts,
           }}
           onListeningStateChange={(isListening) => {
             console.log(
@@ -1091,6 +1144,7 @@ export default function MapComponent({
             );
           }}
           onNearestSafetySpotRequest={handleNearestSafetySpotRequest}
+          onEmergencyAlertRequest={handleEmergencyAlertFromVoice}
         />
       )}
 

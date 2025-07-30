@@ -1,16 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MapPin, MessageCircle, Clock, X } from "lucide-react";
+import { X, Menu, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
 import MapComponent from "@/components/MapComponent";
 import SearchBar from "@/components/SearchBar";
 import { Location, Route, SafeSpot, WalkSession } from "@/types";
+import { handleEmergencyAlertFromVoice } from "@/services/emergencyAlertBridge";
 import { googleMapsService } from "@/services/googleMaps";
 import { elevenLabsService } from "@/services/elevenLabs";
 import { SUPPORTED_CITIES, FIXED_STARTING_LOCATION } from "@/constants";
 import { isWithinTravelRadius, formatDuration, formatDistance } from "@/utils";
 
 export default function Home() {
+  // Wire up voice assistant emergency alert callback
+  if (typeof window !== "undefined" && window.VoiceAssistantService) {
+    try {
+      window.VoiceAssistantService.setCallbacks({
+        onEmergencyAlertRequest: handleEmergencyAlertFromVoice,
+      });
+    } catch (e) {
+      // Ignore if not available
+    }
+  }
+  const router = useRouter();
+
   // Core state
   const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
   const [destination, setDestination] = useState<
@@ -28,6 +42,7 @@ export default function Home() {
   const [showWalkControls, setShowWalkControls] = useState(false);
   const [voiceCompanionEnabled, setVoiceCompanionEnabled] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState(0);
+  const [showMenu, setShowMenu] = useState(false);
 
   // Set fixed starting location (Samvidhan Sadan) on app load
   useEffect(() => {
@@ -48,11 +63,25 @@ export default function Home() {
     if (error) {
       const timer = setTimeout(() => {
         setError(null);
-      }, 3000); // 3 seconds
-
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMenu) {
+        const target = event.target as HTMLElement;
+        if (!target.closest(".menu-container")) {
+          setShowMenu(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMenu]);
 
   // Find safe spots when location changes (based on fixed starting location)
   useEffect(() => {
@@ -316,15 +345,46 @@ export default function Home() {
         />
       </div>
 
-      {/* Floating search bar - Enhanced styling */}
-      <div className="absolute top-6 left-6 right-6 z-10">
-        <SearchBar
-          onDestinationSelect={handleDestinationSelect}
-          currentLocation={FIXED_STARTING_LOCATION}
-          disabled={isRouteLoading}
-          placeholder="Search for destinations in Delhi..."
-        />
+      {/* Floating search bar with menu button */}
+      <div className="absolute top-6 left-2 z-10">
+        <div className="flex items-center gap-3 menu-container">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl p-3 shadow-lg hover:bg-white transition-colors"
+            aria-label="Menu"
+          >
+            <Menu className="h-5 w-5 text-midnight-navy" />
+          </button>
+          <div className="flex-1">
+            <SearchBar
+              onDestinationSelect={handleDestinationSelect}
+              currentLocation={FIXED_STARTING_LOCATION}
+              disabled={isRouteLoading}
+              placeholder="Search for destinations"
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Menu Dropdown */}
+      {showMenu && (
+        <div className="absolute top-20 left-6 z-20 menu-container">
+          <div className="bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-xl p-2 min-w-[200px]">
+            <button
+              onClick={() => {
+                router.push("/trusted-contacts");
+                setShowMenu(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+            >
+              <Users className="h-5 w-5 text-midnight-teal" />
+              <span className="font-medium text-midnight-navy">
+                Trusted Contacts
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Error message - floating with better positioning and auto-dismiss */}
       {error && (

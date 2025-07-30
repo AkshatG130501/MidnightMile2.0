@@ -15,6 +15,7 @@ interface VoiceMicrophoneProps {
   onListeningStateChange?: (isListening: boolean) => void;
   context?: ConversationContext;
   onNearestSafetySpotRequest?: () => Promise<void>;
+  onEmergencyAlertRequest?: () => Promise<void>;
   ref?: React.Ref<VoiceMicrophoneHandle>;
 }
 
@@ -33,6 +34,7 @@ const VoiceMicrophone = React.forwardRef<
       onListeningStateChange,
       context = {},
       onNearestSafetySpotRequest,
+      onEmergencyAlertRequest,
     },
     ref
   ) => {
@@ -108,11 +110,14 @@ const VoiceMicrophone = React.forwardRef<
           voiceAssistantRef.current = new VoiceAssistantService(config);
 
           // Set up voice command callbacks
+          const callbacks: VoiceCommandCallbacks = {};
           if (onNearestSafetySpotRequest) {
-            voiceAssistantRef.current.setCallbacks({
-              onNearestSafetySpotRequest,
-            });
+            callbacks.onNearestSafetySpotRequest = onNearestSafetySpotRequest;
           }
+          if (onEmergencyAlertRequest) {
+            callbacks.onEmergencyAlertRequest = onEmergencyAlertRequest;
+          }
+          voiceAssistantRef.current.setCallbacks(callbacks);
 
           const initialized = await voiceAssistantRef.current.initialize();
           if (initialized) {
@@ -141,14 +146,19 @@ const VoiceMicrophone = React.forwardRef<
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Remove dependency to prevent re-initialization on callback changes
 
-    // Update the callback when it changes without re-initializing
+    // Update the callbacks when they change without re-initializing
     useEffect(() => {
-      if (voiceAssistantRef.current && onNearestSafetySpotRequest) {
-        voiceAssistantRef.current.updateCallbacks({
-          onNearestSafetySpotRequest
-        });
+      if (voiceAssistantRef.current) {
+        const callbacks: VoiceCommandCallbacks = {};
+        if (onNearestSafetySpotRequest) {
+          callbacks.onNearestSafetySpotRequest = onNearestSafetySpotRequest;
+        }
+        if (onEmergencyAlertRequest) {
+          callbacks.onEmergencyAlertRequest = onEmergencyAlertRequest;
+        }
+        voiceAssistantRef.current.updateCallbacks(callbacks);
       }
-    }, [onNearestSafetySpotRequest]);
+    }, [onNearestSafetySpotRequest, onEmergencyAlertRequest]);
 
     // Update context when it changes
     useEffect(() => {

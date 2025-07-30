@@ -530,6 +530,7 @@ class GoogleMapsService {
             avoidHighways: true,
             avoidTolls: true,
             optimizeWaypoints: false,
+            region: "in", // Specify region for better local routing
           };
           break;
 
@@ -543,6 +544,7 @@ class GoogleMapsService {
             avoidHighways: false,
             avoidTolls: false,
             optimizeWaypoints: true,
+            region: "in", // Specify region for better local routing
           };
           break;
 
@@ -557,6 +559,7 @@ class GoogleMapsService {
             avoidHighways: false,
             avoidTolls: true,
             optimizeWaypoints: true,
+            region: "in", // Specify region for better local routing
           };
           break;
       }
@@ -672,17 +675,37 @@ class GoogleMapsService {
       directionsResult.routes[routeIndex] || directionsResult.routes[0];
     const leg = primaryRoute.legs[0];
 
-    // Extract waypoints from the route
+    // Extract waypoints from the route - use all points for precise road following
     const waypoints: Location[] = [];
-    primaryRoute.overview_path.forEach((point, index) => {
-      // Sample waypoints every 10th point to reduce data
-      if (index % 10 === 0) {
+
+    // Try to get detailed path from route steps first (more precise)
+    if (primaryRoute.legs[0]?.steps && primaryRoute.legs[0].steps.length > 0) {
+      primaryRoute.legs[0].steps.forEach((step) => {
+        if (step.path) {
+          step.path.forEach((point) => {
+            waypoints.push({
+              lat: point.lat(),
+              lng: point.lng(),
+            });
+          });
+        }
+      });
+    }
+
+    // Fallback to overview_path if no detailed steps available
+    if (waypoints.length === 0) {
+      primaryRoute.overview_path.forEach((point) => {
         waypoints.push({
           lat: point.lat(),
           lng: point.lng(),
         });
-      }
-    });
+      });
+    }
+
+    // Log route precision for debugging
+    console.log(
+      `Route generated with ${waypoints.length} waypoints for ${routeType} route`
+    );
 
     // Calculate safety score based on route type and characteristics
     const safetyScore = this.calculateSafetyScore(primaryRoute, routeType);
@@ -884,15 +907,21 @@ class GoogleMapsService {
     if (!this.map || route.waypoints.length < 2) return [];
 
     const polylines: google.maps.Polyline[] = [];
-    const segmentCount = Math.min(route.waypoints.length - 1, 20); // Limit segments for performance
-    const segmentSize = Math.floor((route.waypoints.length - 1) / segmentCount);
+
+    // For precise road following, create more segments but with better distribution
+    const totalWaypoints = route.waypoints.length;
+    const segmentCount = Math.min(
+      Math.max(10, Math.floor(totalWaypoints / 50)),
+      30
+    ); // 10-30 segments based on route length
+    const segmentSize = Math.floor(totalWaypoints / segmentCount);
 
     for (let i = 0; i < segmentCount; i++) {
       const startIndex = i * segmentSize;
       const endIndex =
         i === segmentCount - 1
-          ? route.waypoints.length - 1
-          : (i + 1) * segmentSize;
+          ? totalWaypoints - 1
+          : Math.min((i + 1) * segmentSize, totalWaypoints - 1);
 
       // Extract segment waypoints
       const segmentWaypoints = route.waypoints.slice(startIndex, endIndex + 1);
@@ -910,14 +939,15 @@ class GoogleMapsService {
       // Determine color based on safety score
       const color = this.getSafetyColor(segmentSafetyScore);
 
-      // Create polyline for this segment
+      // Create polyline for this segment with improved styling
       const polyline = new google.maps.Polyline({
         path: segmentWaypoints,
         geodesic: true,
         strokeColor: color,
-        strokeOpacity: 0.9,
-        strokeWeight: 6,
+        strokeOpacity: 0.85,
+        strokeWeight: 5,
         map: this.map,
+        zIndex: 1, // Ensure polylines are above base map but below markers
       });
 
       polylines.push(polyline);

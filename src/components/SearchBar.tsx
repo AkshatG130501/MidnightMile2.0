@@ -396,8 +396,7 @@ export default function SearchBar({
             {/* Availability Notice - Always shown at bottom of dropdown */}
             <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
               <p className="text-xs text-gray-600 text-center">
-                🌍 Midnight Mile is currently only available in Delhi and San
-                Francisco.
+                🌍 Midnight Mile is currently only available in Delhi
               </p>
             </div>
           </div>

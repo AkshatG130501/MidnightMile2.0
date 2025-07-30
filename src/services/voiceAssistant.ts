@@ -23,10 +23,18 @@ interface ConversationContext {
     safeSpots: number; // count
     routeType: "safest" | "fastest";
   };
+  trustedContacts?: Array<{
+    name: string;
+    phone: string;
+    email?: string;
+    relationship?: string;
+    isPrimary?: boolean;
+  }>;
 }
 
 interface VoiceCommandCallbacks {
   onNearestSafetySpotRequest?: () => Promise<void>;
+  onEmergencyAlertRequest?: () => Promise<void>;
 }
 
 // TypeScript definitions for Web Speech API
@@ -503,6 +511,38 @@ class VoiceAssistantService {
   private handleSpecialCommands(transcript: string): boolean {
     const lowerTranscript = transcript.toLowerCase().trim();
 
+    // Emergency alert patterns
+    const emergencyPatterns = [
+      /save me/i,
+      /help me/i,
+      /send alert/i,
+      /emergency/i,
+      /sos/i,
+    ];
+    const isEmergencyRequest = emergencyPatterns.some((pattern) =>
+      pattern.test(lowerTranscript)
+    );
+    if (isEmergencyRequest) {
+      console.log("🚨 Emergency alert request detected:", transcript);
+      if (this.callbacks.onEmergencyAlertRequest) {
+        this.voiceQueue
+          .queueVoice(
+            "Sending emergency alert to your trusted contacts now.",
+            "conversation"
+          )
+          .catch(console.error);
+        this.callbacks.onEmergencyAlertRequest();
+      } else {
+        this.voiceQueue
+          .queueVoice(
+            "I want to send an alert, but no contacts are set up.",
+            "conversation"
+          )
+          .catch(console.error);
+      }
+      return true;
+    }
+
     // Check for safety spot requests - expanded patterns
     const safetySpotPatterns = [
       /take me to.*nearest.*safety.*spot/i,
@@ -523,17 +563,16 @@ class VoiceAssistantService {
       /safety.*spot/i,
       /safe.*place/i,
     ];
-
     const isSafetySpotRequest = safetySpotPatterns.some((pattern) =>
       pattern.test(lowerTranscript)
     );
-
     if (isSafetySpotRequest) {
       console.log("🚨 Safety spot request detected:", transcript);
-      
       // Check if we're already handling a safety spot request
       if (this.isHandlingSafetySpot) {
-        console.log("⚠️ Safety spot request already in progress, ignoring duplicate");
+        console.log(
+          "⚠️ Safety spot request already in progress, ignoring duplicate"
+        );
         this.voiceQueue
           .queueVoice(
             "I'm already looking for a safety spot. Please wait.",
@@ -542,11 +581,9 @@ class VoiceAssistantService {
           .catch(console.error);
         return true;
       }
-      
       // Set flag to prevent concurrent requests
       this.isHandlingSafetySpot = true;
       console.log("🔍 Matched pattern, triggering callback...");
-
       // Provide immediate feedback
       this.voiceQueue
         .queueVoice(
@@ -554,11 +591,11 @@ class VoiceAssistantService {
           "navigation"
         )
         .catch(console.error);
-
       // Call the callback if available
       if (this.callbacks.onNearestSafetySpotRequest) {
         console.log("🎯 Calling safety spot callback...");
-        this.callbacks.onNearestSafetySpotRequest()
+        this.callbacks
+          .onNearestSafetySpotRequest()
           .then(() => {
             console.log("✅ Safety spot request completed successfully");
             this.voiceQueue
@@ -593,10 +630,8 @@ class VoiceAssistantService {
         // Reset flag even if no callback
         this.isHandlingSafetySpot = false;
       }
-
       return true; // Command was handled
     }
-
     return false; // No special command detected
   }
 
@@ -739,6 +774,21 @@ class VoiceAssistantService {
    */
   private buildSystemPrompt(): string {
     const routeInfo = this.context.routeDetails;
+    const contacts = this.context.trustedContacts || [];
+
+    let contactsSection = "";
+    if (contacts.length > 0) {
+      contactsSection = `\nTrusted Contacts:\n${contacts
+        .map(
+          (c, i) =>
+            `  ${i + 1}. ${c.name} (${c.relationship || "Contact"})${
+              c.isPrimary ? " [Primary]" : ""
+            }${c.phone ? ", Phone: " + c.phone : ""}${
+              c.email ? ", Email: " + c.email : ""
+            }`
+        )
+        .join("\n")}`;
+    }
 
     const basePrompt = `You are a helpful AI companion for the Midnight Mile personal safety app. You help users navigate safely at night and provide reassurance during their walks.
 
@@ -762,13 +812,14 @@ Route Details:
 - Caution Areas: ${routeInfo.dangerZones} areas requiring extra attention`
     : ""
 }
+${contactsSection}
 
 Guidelines:
 1. Keep responses short and conversational (1-2 sentences max)
 2. Be supportive and reassuring for safety concerns
 3. Focus on navigation, safety, and encouragement
 4. Provide specific information when asked about the route
-5. If the user seems to be in distress, suggest they contact emergency services
+5. If the user seems to be in distress, suggest they contact emergency services or a trusted contact
 6. For casual conversation, keep it brief and redirect to safety/navigation topics
 7. Use the current context to provide relevant, helpful responses
 
@@ -786,6 +837,10 @@ Examples of helpful responses:
 - "There are ${
       routeInfo?.safeSpots || 0
     } safe spots along your route if you need them."
+- "If you need help, you can contact your trusted contacts such as ${contacts
+        .map((c) => c.name)
+        .slice(0, 2)
+        .join(", ")}."
 
 Respond naturally as a caring companion who's walking with them and knows their route details.`;
 
@@ -901,7 +956,8 @@ Respond naturally as a caring companion who's walking with them and knows their 
    */
   updateCallbacks(callbacks: Partial<VoiceCommandCallbacks>): void {
     if (callbacks.onNearestSafetySpotRequest) {
-      this.callbacks.onNearestSafetySpotRequest = callbacks.onNearestSafetySpotRequest;
+      this.callbacks.onNearestSafetySpotRequest =
+        callbacks.onNearestSafetySpotRequest;
       console.log("🔄 Updated safety spot callback");
     }
   }

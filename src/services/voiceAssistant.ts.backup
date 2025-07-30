@@ -22,6 +22,18 @@ interface ConversationContext {
     dangerZones: number; // count
     safeSpots: number; // count
     routeType: "safest" | "fastest";
+interface ConversationContext {
+  currentLocation?: string;
+  destination?: string;
+  routeStatus?: string;
+  safetyScore?: number;
+  walkingState?: "planning" | "walking" | "arrived";
+  routeDetails?: {
+    distance: number; // in meters
+    estimatedTime: number; // in minutes
+    dangerZones: number; // count
+    safeSpots: number; // count
+    routeType: "safest" | "fastest";
   };
 }
 
@@ -94,7 +106,6 @@ class VoiceAssistantService {
   private lastActivityTime: number = Date.now();
   private readonly SAFETY_CHECK_INTERVAL = 10000; // 10 seconds
   private voiceQueue: VoiceQueueService;
-  private isHandlingSafetySpot = false; // Prevent multiple safety spot requests
 
   // ElevenLabs URLs
   private elevenLabsBaseUrl = "https://api.elevenlabs.io/v1";
@@ -383,10 +394,11 @@ class VoiceAssistantService {
       this.safetyCheckTimeout = null;
     }
 
-    // Start safety check if we're listening (regardless of processing status)
-    // The safety check will queue itself and let the voice queue handle prioritization
-    if (!this.isListening) {
-      console.log("Safety check not started - not listening");
+    // Only start if we're listening and not processing
+    if (!this.isListening || this.isProcessing) {
+      console.log(
+        "Safety check not started - not listening or currently processing"
+      );
       return;
     }
 
@@ -396,7 +408,7 @@ class VoiceAssistantService {
     }, this.SAFETY_CHECK_INTERVAL);
 
     console.log(
-      "🔒 Safety check timer started - will trigger in",
+      "Safety check timer started - will trigger in",
       this.SAFETY_CHECK_INTERVAL / 1000,
       "seconds"
     );
@@ -409,10 +421,13 @@ class VoiceAssistantService {
     // Clear the timeout reference since this execution is happening
     this.safetyCheckTimeout = null;
 
-    console.log("🔍 Safety check triggered after 10 seconds of inactivity");
-
-    // Queue safety check regardless of current speaking status
-    // The voice queue will handle prioritization
+    // Don't trigger safety check if AI is currently processing or speaking
+    if (this.isProcessing || this.voiceQueue.isSpeaking()) {
+      console.log("Safety check skipped - AI is currently processing/speaking");
+      // Reschedule the safety check for later
+      this.startSafetyCheck();
+      return;
+    }
 
     // Don't trigger if we're not listening anymore
     if (!this.isListening) {
@@ -498,109 +513,6 @@ class VoiceAssistantService {
   }
 
   /**
-   * Handle special voice commands
-   */
-  private handleSpecialCommands(transcript: string): boolean {
-    const lowerTranscript = transcript.toLowerCase().trim();
-
-    // Check for safety spot requests - expanded patterns
-    const safetySpotPatterns = [
-      /take me to.*nearest.*safety.*spot/i,
-      /go to.*nearest.*safe.*place/i,
-      /find.*nearest.*safety.*spot/i,
-      /nearest.*safe.*spot/i,
-      /take me to.*safe.*place/i,
-      /go to.*safety.*spot/i,
-      /find.*safe.*place/i,
-      /i need.*safe.*place/i,
-      /take me.*safe/i,
-      /nearest.*safe.*place/i,
-      /find.*safe.*spot/i,
-      /add.*safe.*stop/i,
-      /add.*safety.*stop/i,
-      /stop.*safe.*place/i,
-      /safe.*spot/i,
-      /safety.*spot/i,
-      /safe.*place/i,
-    ];
-
-    const isSafetySpotRequest = safetySpotPatterns.some((pattern) =>
-      pattern.test(lowerTranscript)
-    );
-
-    if (isSafetySpotRequest) {
-      console.log("🚨 Safety spot request detected:", transcript);
-      
-      // Check if we're already handling a safety spot request
-      if (this.isHandlingSafetySpot) {
-        console.log("⚠️ Safety spot request already in progress, ignoring duplicate");
-        this.voiceQueue
-          .queueVoice(
-            "I'm already looking for a safety spot. Please wait.",
-            "navigation"
-          )
-          .catch(console.error);
-        return true;
-      }
-      
-      // Set flag to prevent concurrent requests
-      this.isHandlingSafetySpot = true;
-      console.log("🔍 Matched pattern, triggering callback...");
-
-      // Provide immediate feedback
-      this.voiceQueue
-        .queueVoice(
-          "Looking for the nearest safety spot and updating your route.",
-          "navigation"
-        )
-        .catch(console.error);
-
-      // Call the callback if available
-      if (this.callbacks.onNearestSafetySpotRequest) {
-        console.log("🎯 Calling safety spot callback...");
-        this.callbacks.onNearestSafetySpotRequest()
-          .then(() => {
-            console.log("✅ Safety spot request completed successfully");
-            this.voiceQueue
-              .queueVoice(
-                "Route updated! I've added the nearest safety spot to your route.",
-                "navigation"
-              )
-              .catch(console.error);
-          })
-          .catch((error) => {
-            console.error("❌ Error handling safety spot request:", error);
-            this.voiceQueue
-              .queueVoice(
-                "Sorry, I couldn't find a nearby safety spot right now. Please try again.",
-                "navigation"
-              )
-              .catch(console.error);
-          })
-          .finally(() => {
-            // Always reset the flag when done
-            this.isHandlingSafetySpot = false;
-            console.log("🔄 Safety spot handling flag reset");
-          });
-      } else {
-        console.log("⚠️ No callback available for safety spot request");
-        this.voiceQueue
-          .queueVoice(
-            "I understand you want to go to a safety spot, but I can't update your route right now.",
-            "conversation"
-          )
-          .catch(console.error);
-        // Reset flag even if no callback
-        this.isHandlingSafetySpot = false;
-      }
-
-      return true; // Command was handled
-    }
-
-    return false; // No special command detected
-  }
-
-  /**
    * Process transcript: Send to Gemini -> TTS
    */
   private async processTranscript(transcript: string): Promise<void> {
@@ -624,18 +536,6 @@ class VoiceAssistantService {
       }
 
       console.log("Processing transcript:", transcript);
-
-      // Check for special voice commands before processing with AI
-      if (this.handleSpecialCommands(transcript)) {
-        // Command was handled, reset processing flag and restart listening
-        this.isProcessing = false;
-        console.log("Setting isProcessing = false (special command handled)");
-        if (this.isListening) {
-          this.restartListening();
-          this.startSafetyCheck();
-        }
-        return;
-      }
 
       // Temporarily pause speech recognition while processing
       if (this.recognition && this.isRecognitionActive) {
@@ -834,13 +734,6 @@ Respond naturally as a caring companion who's walking with them and knows their 
   }
 
   /**
-   * Set callbacks for voice commands
-   */
-  setCallbacks(callbacks: VoiceCommandCallbacks): void {
-    this.callbacks = callbacks;
-  }
-
-  /**
    * Check if service is properly configured
    */
   isConfigured(): boolean {
@@ -862,7 +755,6 @@ Respond naturally as a caring companion who's walking with them and knows their 
       isListening: this.isListening,
       isRecognitionActive: this.isRecognitionActive,
       isProcessing: this.isProcessing,
-      isHandlingSafetySpot: this.isHandlingSafetySpot,
       hasRecognition: !!this.recognition,
       isSpeaking: this.voiceQueue.isSpeaking(),
       voiceQueueStatus: this.voiceQueue.getQueueStatus(),
@@ -897,22 +789,11 @@ Respond naturally as a caring companion who's walking with them and knows their 
   }
 
   /**
-   * Update callbacks without re-initializing the service
-   */
-  updateCallbacks(callbacks: Partial<VoiceCommandCallbacks>): void {
-    if (callbacks.onNearestSafetySpotRequest) {
-      this.callbacks.onNearestSafetySpotRequest = callbacks.onNearestSafetySpotRequest;
-      console.log("🔄 Updated safety spot callback");
-    }
-  }
-
-  /**
    * Cleanup resources
    */
   cleanup(): void {
     this.stopListening();
     this.isRecognitionActive = false;
-    this.isHandlingSafetySpot = false; // Reset safety spot flag
     if (this.restartTimeout) {
       clearTimeout(this.restartTimeout);
       this.restartTimeout = null;
@@ -955,5 +836,4 @@ export {
   VoiceAssistantService,
   type VoiceAssistantConfig,
   type ConversationContext,
-  type VoiceCommandCallbacks,
 };

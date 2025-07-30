@@ -17,6 +17,7 @@ interface MapComponentProps {
   destination?: (Location & { address: string }) | null; // Add destination prop
   className?: string;
   onRouteSelect?: (route: Route) => void; // Callback when user selects a route
+  onRouteUpdate?: (route: Route) => void; // Callback when route is updated with safety spot
   walkSession?: WalkSession | null; // Add walkSession prop to hide drawer during navigation
   onSimulationProgress?: (progress: number) => void; // Callback for simulation progress (0-100)
 }
@@ -31,6 +32,7 @@ export default function MapComponent({
   destination,
   className = "w-full h-screen",
   onRouteSelect,
+  onRouteUpdate,
   walkSession,
   onSimulationProgress,
 }: MapComponentProps) {
@@ -47,6 +49,7 @@ export default function MapComponent({
   const walkerMarkerRef = useRef<google.maps.Marker | null>(null);
   const walkingAnimationRef = useRef<number | null>(null);
   const voiceMicrophoneRef = useRef<VoiceMicrophoneHandle>(null);
+  const [isProcessingSafetySpot, setIsProcessingSafetySpot] = useState(false);
 
   // Helper function to create custom icons for start and destination points
   const createLocationIcon = (type: "start" | "destination") => {
@@ -876,6 +879,118 @@ export default function MapComponent({
     };
   }, []);
 
+  // Handle request for nearest safety spot
+  const handleNearestSafetySpotRequest = useCallback(async () => {
+    console.log("🚨 Safety spot request callback triggered!");
+    
+    // Prevent multiple concurrent requests
+    if (isProcessingSafetySpot) {
+      console.log("⚠️ Safety spot request already in progress, ignoring");
+      return;
+    }
+    
+    setIsProcessingSafetySpot(true);
+
+    // Use walker position if walking, otherwise use current location
+    const userPosition =
+      walkSession && walkerMarkerRef.current
+        ? {
+            lat:
+              walkerMarkerRef.current.getPosition()?.lat() ||
+              currentLocation?.lat ||
+              0,
+            lng:
+              walkerMarkerRef.current.getPosition()?.lng() ||
+              currentLocation?.lng ||
+              0,
+          }
+        : currentLocation;
+
+    console.log("📍 User position:", userPosition);
+    console.log("🎯 Destination:", destination);
+    console.log("🛣️ Selected route:", selectedRoute?.id);
+    console.log("🛡️ Available safe spots:", safeSpots.length);
+    console.log("🚶 Is walking:", !!walkSession);
+
+    if (!userPosition || !destination || !selectedRoute) {
+      console.log("❌ Cannot add safety spot: missing location data");
+      console.log("Missing:", {
+        userPosition: !userPosition,
+        destination: !destination,
+        selectedRoute: !selectedRoute,
+      });
+      setIsProcessingSafetySpot(false);
+      return;
+    }
+
+    try {
+      console.log("🔍 Finding nearest safety spot...");
+
+      // Find the nearest safety spot from user's current position
+      const nearestSafetySpot = await googleMapsService.findNearestSafetySpot(
+        userPosition,
+        safeSpots
+      );
+
+      if (!nearestSafetySpot) {
+        console.log("❌ No nearby safety spots found");
+        setIsProcessingSafetySpot(false);
+        return;
+      }
+
+      console.log("✅ Found nearest safety spot:", nearestSafetySpot.name);
+      console.log("📍 Safety spot location:", nearestSafetySpot.location);
+
+      // Recalculate route with safety spot as waypoint
+      console.log("🔄 Recalculating route with safety spot...");
+      const updatedRoute =
+        await googleMapsService.recalculateRouteWithSafetySpot(
+          userPosition,
+          nearestSafetySpot.location,
+          destination,
+          selectedRoute.id.includes("safest") ? "safest" : "fastest"
+        );
+
+      if (updatedRoute) {
+        console.log("✅ Route recalculated successfully!");
+        console.log("🛣️ New route ID:", updatedRoute.id);
+        console.log("📏 New route distance:", updatedRoute.distance);
+        console.log("⏱️ New route time:", updatedRoute.estimatedTime);
+
+        // Add safe spots to the updated route
+        updatedRoute.safeSpots = safeSpots.filter(
+          (spot) => spot.distance <= 1000
+        );
+
+        // Call the callback to update the route in the parent component
+        if (onRouteUpdate) {
+          console.log("📤 Calling onRouteUpdate callback...");
+          onRouteUpdate(updatedRoute);
+          console.log("✅ Route update callback completed");
+        } else {
+          console.log("❌ No onRouteUpdate callback available");
+        }
+
+        console.log("🎉 Route updated with safety spot successfully!");
+      } else {
+        console.log("❌ Failed to recalculate route");
+      }
+    } catch (error) {
+      console.error("❌ Error adding safety spot to route:", error);
+    } finally {
+      setIsProcessingSafetySpot(false);
+    }
+  }, [
+    currentLocation,
+    destination,
+    selectedRoute,
+    safeSpots,
+    onRouteUpdate,
+    walkSession,
+    isProcessingSafetySpot,
+    setIsProcessingSafetySpot,
+  ]);
+
   if (error) {
     return (
       <div
@@ -975,6 +1090,7 @@ export default function MapComponent({
               `Voice assistant ${isListening ? "started" : "stopped"} listening`
             );
           }}
+          onNearestSafetySpotRequest={handleNearestSafetySpotRequest}
         />
       )}
 

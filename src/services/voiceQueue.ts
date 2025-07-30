@@ -243,7 +243,8 @@ class VoiceQueueService {
    * Clear the voice queue (for emergencies or interruptions)
    */
   async clearQueue(): Promise<void> {
-    console.log(`Clearing voice queue with ${this.queue.length} pending jobs`);
+    console.log(`🚨 Clearing voice queue with ${this.queue.length} pending jobs`);
+    console.trace("Voice queue cleared from:"); // Add stack trace to see who called this
 
     // Reject all pending jobs
     this.queue.forEach((job) => {

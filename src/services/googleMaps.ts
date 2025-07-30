@@ -981,6 +981,126 @@ class GoogleMapsService {
   }
 
   /**
+   * Find the nearest safety spot from current location
+   */
+  async findNearestSafetySpot(
+    currentLocation: Location,
+    safeSpots: SafeSpot[]
+  ): Promise<SafeSpot | null> {
+    if (!safeSpots || safeSpots.length === 0) {
+      console.log("No safe spots available");
+      return null;
+    }
+
+    // Find the closest safe spot
+    let nearestSpot: SafeSpot | null = null;
+    let shortestDistance = Infinity;
+
+    for (const spot of safeSpots) {
+      const distance = calculateDistance(currentLocation, spot.location);
+      if (distance < shortestDistance) {
+        shortestDistance = distance;
+        nearestSpot = spot;
+      }
+    }
+
+    console.log(
+      `Nearest safety spot: ${nearestSpot?.name} at ${shortestDistance.toFixed(
+        0
+      )}m`
+    );
+    return nearestSpot;
+  }
+
+  /**
+   * Recalculate route with safety spot as waypoint
+   */
+  async recalculateRouteWithSafetySpot(
+    start: Location,
+    safetySpot: Location,
+    destination: Location,
+    preference: "fastest" | "safest" | "balanced" = "safest"
+  ): Promise<Route | null> {
+    await this.initialize();
+
+    if (!this.directionsService) {
+      throw new Error("Directions service not initialized");
+    }
+
+    return new Promise((resolve, reject) => {
+      const request: google.maps.DirectionsRequest = {
+        origin: new google.maps.LatLng(start.lat, start.lng),
+        destination: new google.maps.LatLng(destination.lat, destination.lng),
+        waypoints: [
+          {
+            location: new google.maps.LatLng(safetySpot.lat, safetySpot.lng),
+            stopover: true,
+          },
+        ],
+        travelMode: google.maps.TravelMode.WALKING,
+        provideRouteAlternatives: false,
+        avoidHighways: preference === "safest",
+        avoidTolls: true,
+        optimizeWaypoints: false, // Keep the safety spot as the first waypoint
+      };
+
+      this.directionsService!.route(request, (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          const route = result.routes[0];
+          const legs = route.legs;
+
+          // Calculate total distance and time
+          let totalDistance = 0;
+          let totalDuration = 0;
+
+          legs.forEach((leg) => {
+            totalDistance += leg.distance?.value || 0;
+            totalDuration += leg.duration?.value || 0;
+          });
+
+          // Extract waypoints from the route
+          const waypoints: Location[] = [];
+
+          // Add start point
+          waypoints.push(start);
+
+          // Add safety spot waypoint
+          waypoints.push(safetySpot);
+
+          // Add intermediate points from route steps
+          legs.forEach((leg) => {
+            leg.steps.forEach((step) => {
+              waypoints.push({
+                lat: step.end_location.lat(),
+                lng: step.end_location.lng(),
+              });
+            });
+          });
+
+          // Calculate safety score for the new route
+          const safetyScore = this.calculateSafetyScore(route, preference);
+
+          const processedRoute: Route = {
+            id: `${preference}-with-safety-spot-${generateId()}`,
+            start,
+            end: destination,
+            waypoints,
+            safetyScore,
+            estimatedTime: Math.round(totalDuration / 60), // Convert to minutes
+            distance: totalDistance,
+            dangerZones: [], // Would be populated with actual danger zone data
+            safeSpots: [], // Will be populated by the calling code
+          };
+
+          resolve(processedRoute);
+        } else {
+          reject(new Error(`Route calculation failed: ${status}`));
+        }
+      });
+    });
+  }
+
+  /**
    * Get color based on safety score
    */
   private getSafetyColor(safetyScore: number): string {

@@ -197,6 +197,41 @@ export default function Home() {
     }
   };
 
+  // Handle route update with safety spot
+  const handleRouteUpdate = (updatedRoute: Route) => {
+    console.log("📤 Received route update in page.tsx");
+    console.log("🆔 Updated route ID:", updatedRoute.id);
+    console.log("🛣️ Updated route waypoints:", updatedRoute.waypoints.length);
+
+    // Update the selected route
+    setSelectedRoute(updatedRoute);
+    console.log("✅ Selected route updated");
+
+    // Update the routes array if it exists
+    if (routes) {
+      const updatedRoutes = routes.map((route) =>
+        route.id === selectedRoute?.id ? updatedRoute : route
+      );
+      setRoutes(updatedRoutes);
+      console.log("✅ Routes array updated");
+    } else {
+      console.log("⚠️ No routes array to update");
+    }
+
+    // If there's an active walk session, update it with the new route
+    if (walkSession) {
+      setWalkSession({
+        ...walkSession,
+        route: updatedRoute,
+      });
+      console.log("✅ Walk session updated with new route");
+    } else {
+      console.log("ℹ️ No active walk session to update");
+    }
+
+    console.log("🎉 Route update completed successfully!");
+  };
+
   // Toggle voice companion
   const handleVoiceToggle = () => {
     setVoiceCompanionEnabled(!voiceCompanionEnabled);
@@ -275,6 +310,7 @@ export default function Home() {
           destination={destination}
           className="w-full h-full"
           onRouteSelect={handleRouteSelect}
+          onRouteUpdate={handleRouteUpdate}
           walkSession={walkSession}
           onSimulationProgress={setSimulationProgress}
         />

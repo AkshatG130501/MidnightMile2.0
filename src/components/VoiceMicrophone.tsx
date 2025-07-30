@@ -275,7 +275,7 @@ const VoiceMicrophone = React.forwardRef<
 
         {/* Status text */}
         <div className="text-center">
-          <p className="text-xs font-medium text-[#0C1E3C]">
+          <p className="text-xs font-medium text-white">
             {isListening
               ? "Always Listening"
               : isInitialized
@@ -285,7 +285,7 @@ const VoiceMicrophone = React.forwardRef<
               : "Initializing..."}
           </p>
           {isListening && (
-            <p className="text-xs text-gray-600 mt-1">Speak anytime</p>
+            <p className="text-xs text-white mt-1">Speak anytime</p>
           )}
           {!isInitialized && !isListening && (
             <p className="text-xs text-gray-500 mt-1">

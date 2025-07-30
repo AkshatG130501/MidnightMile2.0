@@ -8,12 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "midnight-navy": "#0C1E3C",
-        "midnight-slate": "#4A5568",
-        "midnight-beige": "#F5EDE0",
-        "midnight-teal": "#3D828B",
-        "midnight-amber": "#FFB100",
-        "midnight-coral": "#E37B7B",
+        "midnight-navy": "#0C2C4B",   // Deep blue background
+        "midnight-slate": "#12395B",  // Muted lighter blue (UI or hover)
+        "midnight-beige": "#F2F2F2",  // Moon / star white
+        "midnight-teal": "#356C97",   // Road blue tone
+        "midnight-amber": "#9BB4D4",  // Accent tone (optional highlights)
+        "midnight-coral": "#F7F7F7",  // Slightly off-white (used in stars)
       },
       animation: {
         "slide-in": "slideIn 0.2s ease-out",

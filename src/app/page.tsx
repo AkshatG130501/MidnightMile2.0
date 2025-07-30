@@ -517,7 +517,7 @@ export default function Home() {
             onClear={handleSearchClear}
             currentLocation={FIXED_STARTING_LOCATION}
             disabled={isRouteLoading}
-            placeholder="Search for destinations in Delhi..."
+            placeholder="Search for destination"
           />
         </div>
       )}

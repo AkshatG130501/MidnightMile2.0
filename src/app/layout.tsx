@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   authors: [{ name: "Midnight Mile Team" }],
   viewport:
     "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+  icons: {
+    icon: "/midnight-mile-logo.png",
+    apple: "/midnight-mile-logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -30,7 +34,8 @@ export default function RootLayout({
           name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
         />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/midnight-mile-logo.png" />
+        <link rel="apple-touch-icon" href="/midnight-mile-logo.png" />
       </head>
       <body
         className={`${inter.variable} font-sans antialiased h-full bg-white text-midnight-navy`}

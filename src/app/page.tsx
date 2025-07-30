@@ -324,7 +324,7 @@ export default function Home() {
     setSelectedRoute(null); // Clear selected route
     setRoutes(null); // Clear all routes
     setDestination(null); // Clear destination
-    
+
     // Add haptic feedback
     if (navigator.vibrate) {
       navigator.vibrate([100, 50, 100]); // Double vibration for navigation end

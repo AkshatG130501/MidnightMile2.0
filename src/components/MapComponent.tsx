@@ -19,6 +19,7 @@ interface MapComponentProps {
   onRouteUpdate?: (route: Route) => void; // Callback when route is updated with safety spot
   walkSession?: WalkSession | null; // Add walkSession prop to hide drawer during navigation
   onSimulationProgress?: (progress: number) => void; // Callback for simulation progress (0-100)
+  isImmersiveMode?: boolean; // New prop for 3D street view mode
 }
 
 export default function MapComponent({
@@ -34,6 +35,7 @@ export default function MapComponent({
   onRouteUpdate,
   walkSession,
   onSimulationProgress,
+  isImmersiveMode = false,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -94,7 +96,17 @@ export default function MapComponent({
   };
 
   // Helper function to create walking person icon
-  const createWalkerIcon = () => {
+  const createWalkerIcon = (isImmersive = false) => {
+    const size = isImmersive ? 48 : 36; // Larger icon in immersive mode
+    const glowEffect = isImmersive
+      ? `<circle cx="${size / 2}" cy="${size / 2}" r="${
+          size / 2 - 2
+        }" fill="none" stroke="#00D4FF" stroke-width="2" opacity="0.6"/>
+       <circle cx="${size / 2}" cy="${size / 2}" r="${
+          size / 2 - 4
+        }" fill="none" stroke="#00D4FF" stroke-width="1" opacity="0.3"/>`
+      : "";
+
     const walkerSvg = `
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- Person walking icon -->
@@ -108,15 +120,18 @@ export default function MapComponent({
       url:
         "data:image/svg+xml;charset=UTF-8," +
         encodeURIComponent(`
-        <svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="18" cy="18" r="16" fill="#2563EB" stroke="white" stroke-width="2"/>
-          <g transform="translate(8, 8)">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+          ${glowEffect}
+          <circle cx="${size / 2}" cy="${size / 2}" r="${
+          size / 2 - 4
+        }" fill="#2563EB" stroke="white" stroke-width="2"/>
+          <g transform="translate(${size / 2 - 10}, ${size / 2 - 10})">
             ${walkerSvg}
           </g>
         </svg>
       `),
-      scaledSize: new google.maps.Size(36, 36),
-      anchor: new google.maps.Point(18, 18),
+      scaledSize: new google.maps.Size(size, size),
+      anchor: new google.maps.Point(size / 2, size / 2),
     };
   };
 
@@ -303,13 +318,15 @@ export default function MapComponent({
       let currentCheckpointIndex = 0;
       let hasAnnouncedCheckpoint = false;
 
-      // Create walker marker
+      // Create walker marker with smooth animation
       walkerMarkerRef.current = new google.maps.Marker({
         position: pathPoints[0],
         map: map,
-        icon: createWalkerIcon(),
+        icon: createWalkerIcon(isImmersiveMode),
         title: "Walking...",
         zIndex: 1000,
+        animation: google.maps.Animation.DROP, // Add entrance animation
+        optimized: false, // Better for smooth animations
       });
 
       const animationDuration = 300000; // 5 minutes in milliseconds
@@ -362,7 +379,44 @@ export default function MapComponent({
           );
 
           if (walkerMarkerRef.current) {
+            // Use smooth position transition for walker
             walkerMarkerRef.current.setPosition(currentPosition);
+          }
+
+          // Enhanced camera tracking - always follow walker with smooth animation
+          if (map) {
+            // Always follow the walker smoothly with animation
+            map.panTo(currentPosition);
+
+            if (isImmersiveMode) {
+              // Enhanced 3D camera tracking in immersive mode
+              // Calculate direction heading for realistic camera movement
+              if (currentSegmentIndex + 1 < pathPoints.length) {
+                const nextPoint = pathPoints[currentSegmentIndex + 1];
+                const heading = google.maps.geometry.spherical.computeHeading(
+                  new google.maps.LatLng(
+                    currentPosition.lat,
+                    currentPosition.lng
+                  ),
+                  new google.maps.LatLng(nextPoint.lat, nextPoint.lng)
+                );
+
+                // Smooth heading transition
+                map.setHeading(heading);
+              }
+
+              // Add slight zoom variation for dynamic feel
+              const baseZoom = 19;
+              const zoomVariation = 0.5 * Math.sin(elapsed / 2000); // Subtle breathing effect
+              map.setZoom(baseZoom + zoomVariation);
+
+              // Maintain 3D tilt for street view effect
+              map.setTilt(45);
+            } else {
+              // Normal mode - keep walker centered with appropriate zoom
+              map.setZoom(17);
+              map.setTilt(0);
+            }
           }
 
           // Check if we've reached the next checkpoint
@@ -447,6 +501,55 @@ export default function MapComponent({
 
     initMap();
   }, [center, onLocationSelect]);
+
+  // Handle 3D Immersive Street View Mode
+  useEffect(() => {
+    if (!map || !currentLocation) return;
+
+    if (isImmersiveMode) {
+      // Switch to 3D street-level view
+      map.setOptions({
+        mapTypeId: google.maps.MapTypeId.SATELLITE, // Switch to satellite for more immersive feel
+        tilt: 45, // Add 3D tilt effect
+        zoom: 19, // Close zoom for street-level view
+        heading: 0, // Face north initially
+        disableDefaultUI: true, // Hide all UI for immersive experience
+        gestureHandling: "greedy", // Allow smooth gestures
+        panControl: false, // Disable manual pan control during tracking
+      });
+
+      // Smooth transition to current location with tilt
+      map.panTo(currentLocation);
+      map.setTilt(45);
+      map.setZoom(19);
+
+      // Add rotation animation if there's a selected route
+      if (selectedRoute && selectedRoute.waypoints.length > 1) {
+        const firstWaypoint = selectedRoute.waypoints[0];
+        const secondWaypoint = selectedRoute.waypoints[1];
+
+        // Calculate heading towards next waypoint
+        const heading = google.maps.geometry.spherical.computeHeading(
+          new google.maps.LatLng(firstWaypoint.lat, firstWaypoint.lng),
+          new google.maps.LatLng(secondWaypoint.lat, secondWaypoint.lng)
+        );
+
+        // Smooth rotation towards the route direction
+        map.setHeading(heading);
+      }
+    } else {
+      // Return to normal map view with smooth following
+      map.setOptions({
+        mapTypeId: google.maps.MapTypeId.ROADMAP,
+        tilt: 0,
+        zoom: 17, // Appropriate zoom for following walker
+        heading: 0,
+        disableDefaultUI: false,
+        gestureHandling: "cooperative",
+        panControl: true, // Allow manual control when not in immersive mode
+      });
+    }
+  }, [map, currentLocation, isImmersiveMode, selectedRoute]);
 
   // Update current location marker (fixed starting location)
   useEffect(() => {
@@ -868,13 +971,13 @@ export default function MapComponent({
   // Handle request for nearest safety spot
   const handleNearestSafetySpotRequest = useCallback(async () => {
     console.log("🚨 Safety spot request callback triggered!");
-    
+
     // Prevent multiple concurrent requests
     if (isProcessingSafetySpot) {
       console.log("⚠️ Safety spot request already in progress, ignoring");
       return;
     }
-    
+
     setIsProcessingSafetySpot(true);
 
     // Use walker position if walking, otherwise use current location

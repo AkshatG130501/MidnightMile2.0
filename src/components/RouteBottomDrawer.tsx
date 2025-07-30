@@ -253,7 +253,10 @@ export default function RouteBottomDrawer({
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-40 transition-opacity duration-300"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
         />
       )}
 
@@ -301,7 +304,10 @@ export default function RouteBottomDrawer({
               </p>
             </div>
             <button
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors ml-4"
               aria-label="Close drawer"
             >

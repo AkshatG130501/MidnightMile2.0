@@ -7,6 +7,7 @@ import { googleMapsService } from "@/services/googleMaps";
 
 interface SearchBarProps {
   onDestinationSelect: (location: Location & { address: string }) => void;
+  onClear?: () => void; // Optional callback when search is cleared
   placeholder?: string;
   currentLocation?: Location;
   disabled?: boolean;
@@ -24,6 +25,7 @@ interface SearchResult {
 
 export default function SearchBar({
   onDestinationSelect,
+  onClear,
   placeholder = "Search for a place",
   currentLocation,
   disabled = false,
@@ -202,6 +204,8 @@ export default function SearchBar({
     setResults([]);
     setShowResults(false);
     inputRef.current?.focus();
+    // Call onClear callback if provided
+    onClear?.();
   };
 
   // Handle click outside to close dropdown

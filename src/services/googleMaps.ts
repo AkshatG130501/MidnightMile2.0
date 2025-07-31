@@ -1102,19 +1102,23 @@ class GoogleMapsService {
           // Extract waypoints from the route
           const waypoints: Location[] = [];
 
-          // Add start point
-          waypoints.push(start);
-
-          // Add safety spot waypoint
-          waypoints.push(safetySpot);
-
-          // Add intermediate points from route steps
+          // Build detailed waypoints from each step's path to ensure street-level accuracy
           legs.forEach((leg) => {
             leg.steps.forEach((step) => {
-              waypoints.push({
-                lat: step.end_location.lat(),
-                lng: step.end_location.lng(),
-              });
+              if (step.path && step.path.length) {
+                step.path.forEach((pt) => {
+                  waypoints.push({
+                    lat: pt.lat(),
+                    lng: pt.lng(),
+                  });
+                });
+              } else {
+                // Fallback: use step end location if path is unavailable
+                waypoints.push({
+                  lat: step.end_location.lat(),
+                  lng: step.end_location.lng(),
+                });
+              }
             });
           });
 

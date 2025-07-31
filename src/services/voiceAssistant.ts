@@ -35,6 +35,8 @@ interface ConversationContext {
 interface VoiceCommandCallbacks {
   onNearestSafetySpotRequest?: () => Promise<void>;
   onEmergencyAlertRequest?: () => Promise<void>;
+  onEndNavigationRequest?: () => Promise<void>;
+  onChangeDestinationRequest?: (destination: string) => Promise<void>;
 }
 
 // TypeScript definitions for Web Speech API
@@ -632,6 +634,49 @@ class VoiceAssistantService {
       }
       return true; // Command was handled
     }
+    // End navigation commands
+    const endNavPatterns = [
+      /stop navigation/i,
+      /end navigation/i,
+      /exit navigation/i,
+      /finish navigation/i,
+    ];
+    const isEndNavRequest = endNavPatterns.some((pattern) =>
+      pattern.test(lowerTranscript)
+    );
+    if (isEndNavRequest) {
+      console.log("🛑 End navigation request detected:", transcript);
+      this.voiceQueue
+        .queueVoice("Ending navigation now.", "navigation")
+        .catch(console.error);
+      if (this.callbacks.onEndNavigationRequest) {
+        this.callbacks.onEndNavigationRequest();
+      }
+      return true;
+    }
+
+    // Change destination command
+    const changeDestMatch = lowerTranscript.match(
+      /change (?:my |the )?destination to (.+)/i
+    );
+    if (changeDestMatch && changeDestMatch[1]) {
+      const newDestination = changeDestMatch[1].trim();
+      console.log(
+        "🗺️ Change destination request detected:",
+        newDestination
+      );
+      this.voiceQueue
+        .queueVoice(
+          `Changing destination to ${newDestination}.`,
+          "navigation"
+        )
+        .catch(console.error);
+      if (this.callbacks.onChangeDestinationRequest) {
+        this.callbacks.onChangeDestinationRequest(newDestination);
+      }
+      return true;
+    }
+
     return false; // No special command detected
   }
 
@@ -959,6 +1004,20 @@ Respond naturally as a caring companion who's walking with them and knows their 
       this.callbacks.onNearestSafetySpotRequest =
         callbacks.onNearestSafetySpotRequest;
       console.log("🔄 Updated safety spot callback");
+    }
+    if (callbacks.onEmergencyAlertRequest) {
+      this.callbacks.onEmergencyAlertRequest =
+        callbacks.onEmergencyAlertRequest;
+      console.log("🔄 Updated emergency alert callback");
+    }
+    if (callbacks.onEndNavigationRequest) {
+      this.callbacks.onEndNavigationRequest = callbacks.onEndNavigationRequest;
+      console.log("🔄 Updated end navigation callback");
+    }
+    if (callbacks.onChangeDestinationRequest) {
+      this.callbacks.onChangeDestinationRequest =
+        callbacks.onChangeDestinationRequest;
+      console.log("🔄 Updated change destination callback");
     }
   }
 

@@ -26,7 +26,9 @@ interface MapComponentProps {
   onRouteUpdate?: (route: Route) => void; // Callback when route is updated with safety spot
   walkSession?: WalkSession | null; // Add walkSession prop to hide drawer during navigation
   onSimulationProgress?: (progress: number) => void; // Callback for simulation progress (0-100)
-  isImmersiveMode?: boolean; // New prop for 3D street view mode
+  isImmersiveMode?: boolean;
+  onEndNavigationRequest?: () => Promise<void>;
+  onChangeDestinationRequest?: (destination: string) => Promise<void>; // Callbacks from parent
 }
 
 export default function MapComponent({
@@ -43,6 +45,8 @@ export default function MapComponent({
   walkSession,
   onSimulationProgress,
   isImmersiveMode = false,
+  onEndNavigationRequest,
+  onChangeDestinationRequest,
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -1234,6 +1238,12 @@ export default function MapComponent({
           }}
           onNearestSafetySpotRequest={handleNearestSafetySpotRequest}
           onEmergencyAlertRequest={handleEmergencyAlertFromVoice}
+          onEndNavigationRequest={onEndNavigationRequest ? async () => await onEndNavigationRequest() : undefined}
+          onChangeDestinationRequest={
+            onChangeDestinationRequest
+              ? async (dest: string) => await onChangeDestinationRequest(dest)
+              : undefined
+          }
         />
       )}
     </div>

@@ -16,6 +16,8 @@ interface VoiceMicrophoneProps {
   context?: ConversationContext;
   onNearestSafetySpotRequest?: () => Promise<void>;
   onEmergencyAlertRequest?: () => Promise<void>;
+  onEndNavigationRequest?: () => Promise<void>;
+  onChangeDestinationRequest?: (destination: string) => Promise<void>;
   ref?: React.Ref<VoiceMicrophoneHandle>;
 }
 
@@ -35,6 +37,8 @@ const VoiceMicrophone = React.forwardRef<
       context = {},
       onNearestSafetySpotRequest,
       onEmergencyAlertRequest,
+      onEndNavigationRequest,
+      onChangeDestinationRequest,
     },
     ref
   ) => {
@@ -156,9 +160,15 @@ const VoiceMicrophone = React.forwardRef<
         if (onEmergencyAlertRequest) {
           callbacks.onEmergencyAlertRequest = onEmergencyAlertRequest;
         }
+        if (onEndNavigationRequest) {
+          callbacks.onEndNavigationRequest = onEndNavigationRequest;
+        }
+        if (onChangeDestinationRequest) {
+          callbacks.onChangeDestinationRequest = onChangeDestinationRequest;
+        }
         voiceAssistantRef.current.updateCallbacks(callbacks);
       }
-    }, [onNearestSafetySpotRequest, onEmergencyAlertRequest]);
+    }, [onNearestSafetySpotRequest, onEmergencyAlertRequest, onEndNavigationRequest, onChangeDestinationRequest]);
 
     // Update context when it changes
     useEffect(() => {

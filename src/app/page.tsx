@@ -21,9 +21,9 @@ export default function Home() {
   const { user, loading: authLoading } = useAuth();
 
   // Wire up voice assistant emergency alert callback
-  if (typeof window !== "undefined" && window.VoiceAssistantService) {
+  if (typeof window !== "undefined" && (window as any).VoiceAssistantService) {
     try {
-      window.VoiceAssistantService.setCallbacks({
+      (window as any).VoiceAssistantService.setCallbacks({
         onEmergencyAlertRequest: handleEmergencyAlertFromVoice,
       });
     } catch (e) {
@@ -334,6 +334,85 @@ export default function Home() {
     console.log("🎉 Route update completed successfully!");
   };
 
+  // Handle voice end navigation request
+  const handleEndNavigationFromVoice = async (): Promise<void> => {
+    console.log("🎙️ Voice requested to end navigation");
+    handleExitImmersiveMode();
+  };
+
+  // Handle voice change destination request
+  const handleChangeDestinationFromVoice = async (
+    destinationQuery: string
+  ): Promise<void> => {
+    try {
+      console.log("🎙️ Voice requested destination change to:", destinationQuery);
+      // Search for the destination near the fixed starting location
+      const searchResults = await googleMapsService.searchPlaces(
+        destinationQuery,
+        FIXED_STARTING_LOCATION
+      );
+
+      if (!searchResults || searchResults.length === 0) {
+        console.log("❌ No search results found for", destinationQuery);
+        setError("Destination not found. Please try again.");
+        return;
+      }
+
+      const topResult = searchResults[0];
+      const lat = topResult.geometry?.location?.lat();
+      const lng = topResult.geometry?.location?.lng();
+      if (lat === undefined || lng === undefined) {
+        console.log("❌ Top result missing geometry");
+        setError("Unable to get destination location.");
+        return;
+      }
+
+      const dest = {
+        lat,
+        lng,
+        address: topResult.formatted_address || topResult.name || destinationQuery,
+      } as Location & { address: string };
+
+      // Directly calculate routes and update state
+      setIsRouteLoading(true);
+      const routeAlternatives =
+        await googleMapsService.calculateRouteAlternatives(
+          FIXED_STARTING_LOCATION,
+          dest
+        );
+      setIsRouteLoading(false);
+
+      if (!routeAlternatives || routeAlternatives.length === 0) {
+        setError("No routes available to new destination.");
+        return;
+      }
+
+      const routesWithSafeSpots = routeAlternatives.map((route) => ({
+        ...route,
+        safeSpots: safeSpots.filter((spot) => spot.distance <= 1000),
+      }));
+      const sortedRoutes = routesWithSafeSpots.sort(
+        (a, b) => b.safetyScore.overall - a.safetyScore.overall
+      );
+
+      setRoutes(sortedRoutes);
+      setSelectedRoute(sortedRoutes[0]);
+      setDestination(dest);
+
+      if (walkSession) {
+        // Update active walk session with new route
+        setWalkSession({
+          ...walkSession,
+          route: sortedRoutes[0],
+        });
+      }
+
+    } catch (err) {
+      console.error("Error changing destination:", err);
+      setError("Failed to change destination. Please try again.");
+    }
+  };
+
   // Toggle voice companion
   const handleVoiceToggle = () => {
     setVoiceCompanionEnabled(!voiceCompanionEnabled);
@@ -506,6 +585,8 @@ export default function Home() {
           walkSession={walkSession}
           onSimulationProgress={setSimulationProgress}
           isImmersiveMode={isImmersiveMode}
+          onEndNavigationRequest={handleEndNavigationFromVoice}
+          onChangeDestinationRequest={handleChangeDestinationFromVoice}
         />
       </div>
 

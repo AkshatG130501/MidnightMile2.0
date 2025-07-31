@@ -17,13 +17,24 @@ import { isWithinTravelRadius, formatDuration, formatDistance } from "@/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+// Augment the Window interface to include the VoiceAssistantService
+declare global {
+  interface Window {
+    VoiceAssistantService?: {
+      setCallbacks: (callbacks: {
+        onEmergencyAlertRequest: () => void;
+      }) => void;
+    };
+  }
+}
+
 export default function Home() {
   const { user, loading: authLoading } = useAuth();
 
   // Wire up voice assistant emergency alert callback
-  if (typeof window !== "undefined" && (window as any).VoiceAssistantService) {
+  if (typeof window !== "undefined" && window.VoiceAssistantService) {
     try {
-      (window as any).VoiceAssistantService.setCallbacks({
+      window.VoiceAssistantService.setCallbacks({
         onEmergencyAlertRequest: handleEmergencyAlertFromVoice,
       });
     } catch (e) {

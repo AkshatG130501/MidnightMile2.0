@@ -34,13 +34,11 @@ interface MapComponentProps {
 export default function MapComponent({
   center,
   onLocationSelect,
-  routes,
   selectedRoute,
   safeSpots = [],
   currentLocation,
   destination,
   className = "w-full h-screen",
-  onRouteSelect,
   onRouteUpdate,
   walkSession,
   onSimulationProgress,
@@ -474,6 +472,7 @@ export default function MapComponent({
       announceNavigation,
       createRouteCheckpoints,
       generateNavigationInstruction,
+      isImmersiveMode,
     ]
   );
 
@@ -1238,7 +1237,11 @@ export default function MapComponent({
           }}
           onNearestSafetySpotRequest={handleNearestSafetySpotRequest}
           onEmergencyAlertRequest={handleEmergencyAlertFromVoice}
-          onEndNavigationRequest={onEndNavigationRequest ? async () => await onEndNavigationRequest() : undefined}
+          onEndNavigationRequest={
+            onEndNavigationRequest
+              ? async () => await onEndNavigationRequest()
+              : undefined
+          }
           onChangeDestinationRequest={
             onChangeDestinationRequest
               ? async (dest: string) => await onChangeDestinationRequest(dest)

@@ -690,7 +690,7 @@ class GoogleMapsService {
     const waypoints: Location[] = [];
 
     // Use the detailed path from overview_path for accurate road following
-    primaryRoute.overview_path.forEach((point, index) => {
+    primaryRoute.overview_path.forEach((point) => {
       waypoints.push({
         lat: point.lat(),
         lng: point.lng(),

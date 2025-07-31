@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { User, LogOut, Settings, MapPin, Users } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function UserProfileDropdown() {
@@ -76,8 +76,6 @@ export default function UserProfileDropdown() {
 
           {/* Menu Items */}
           <div className="py-1">
-      
-
             <button
               className="w-full flex items-center space-x-3 px-4 py-2 text-sm text-midnight-slate hover:bg-midnight-beige/30 transition-colors"
               onClick={() => (window.location.href = "/trusted-contacts")}
@@ -85,10 +83,6 @@ export default function UserProfileDropdown() {
               <Users className="h-4 w-4 text-midnight-teal" />
               <span>Trusted Contacts</span>
             </button>
-
-           
-
-            
           </div>
 
           {/* Sign Out */}

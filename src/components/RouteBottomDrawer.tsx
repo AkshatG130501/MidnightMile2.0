@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Route } from "@/types";
 import { COLORS } from "@/constants";
 import {
@@ -44,9 +44,15 @@ export default function RouteBottomDrawer({
   const carouselRef = useRef<HTMLDivElement>(null);
 
   // Sort routes by safety score (safest first)
-  const sortedRoutes = routes
-    ? [...routes].sort((a, b) => b.safetyScore.overall - a.safetyScore.overall)
-    : [];
+  const sortedRoutes = useMemo(
+    () =>
+      routes
+        ? [...routes].sort(
+            (a, b) => b.safetyScore.overall - a.safetyScore.overall
+          )
+        : [],
+    [routes]
+  );
 
   // Call onRoutePreview when carousel index changes
   useEffect(() => {

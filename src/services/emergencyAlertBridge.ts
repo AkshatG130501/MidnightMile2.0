@@ -21,7 +21,7 @@ export function getTrustedContactsAndLocation(): {
           lng: position.coords.longitude,
         };
       },
-      (error) => {
+      () => {
         userLocation = null;
       }
     );
